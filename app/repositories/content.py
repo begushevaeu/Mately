@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import ContentItem, Rating
+from app.models import Comment, ContentItem, Rating
 
 
 class ContentRepository:
@@ -68,3 +68,9 @@ class ContentRepository:
 
         await self.session.flush()
         return rating
+
+    async def add_comment(self, *, content_id: int, user_id: int, text: str) -> Comment:
+        comment = Comment(content_id=content_id, user_id=user_id, text=text)
+        self.session.add(comment)
+        await self.session.flush()
+        return comment

@@ -7,7 +7,7 @@ from html import escape
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ContentItem, Couple, Rating, User
+from app.models import Comment, ContentItem, Couple, Rating, User
 from app.repositories.content import ContentRepository
 from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
@@ -172,6 +172,12 @@ class ContentService:
             emoji=emoji,
         )
 
+    async def add_comment(self, current_user: User, *, content_id: int, text: str) -> Comment:
+        text = normalize_comment_text(text)
+        context = await self.get_context(current_user)
+        item = await self._get_scoped_item(context, content_id)
+        return await self.content.add_comment(content_id=item.id, user_id=current_user.id, text=text)
+
     async def build_content_card(self, context: ContentContext, item: ContentItem) -> str:
         owner_label = await self._actor_line(context, item.added_by)
         lines = [
@@ -186,6 +192,11 @@ class ContentService:
         reaction_line = format_reactions(item)
         if reaction_line:
             lines.append(f"Реакции: {reaction_line}")
+
+        comment_lines = await self._comment_lines(context, item)
+        if comment_lines:
+            lines.append("Комментарии:")
+            lines.extend(comment_lines)
 
         return "\n".join(lines)
 
@@ -205,6 +216,14 @@ class ContentService:
 
         display = await self.aliases.get_display_for(owner=context.current_user, partner=user)
         return display.nominative_with_emoji
+
+    async def _comment_lines(self, context: ContentContext, item: ContentItem) -> list[str]:
+        comments = sorted_comments(item)
+        lines = []
+        for comment in comments:
+            author = await self._actor_line(context, comment.user_id)
+            lines.append(f"• {author}: {escape(comment.text)}")
+        return lines
 
     async def _display_for_partner_or_fallback(self, *, owner: User | None, partner: User) -> DisplayName:
         if owner is None:
@@ -237,6 +256,25 @@ def apply_content_filter(
         filtered_items.append(item)
 
     return sorted_content_items(filtered_items)
+
+
+def normalize_comment_text(value: str) -> str:
+    normalized = " ".join(value.strip().split())
+    if not normalized:
+        raise ContentServiceError("Комментарий не должен быть пустым")
+    if len(normalized) > 1000:
+        raise ContentServiceError("Комментарий получился слишком длинным")
+    return normalized
+
+
+def sorted_comments(item: ContentItem) -> list[Comment]:
+    return sorted(
+        item.comments,
+        key=lambda comment: (
+            comment.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            comment.id or 0,
+        ),
+    )
 
 
 def sorted_content_items(items: list[ContentItem]) -> list[ContentItem]:

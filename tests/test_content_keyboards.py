@@ -29,6 +29,14 @@ def test_content_list_keyboard_switches_action_by_status() -> None:
 
     buttons = extract_buttons(build_content_list_keyboard([planned, completed]))
 
-    assert [button.text for button in buttons] == ["Готово #1", "Оценить #2", "Назад к контенту"]
+    assert [button.text for button in buttons] == [
+        "Готово #1",
+        "Комментарий #1",
+        "Оценить #2",
+        "Комментарий #2",
+        "Назад к контенту",
+    ]
     assert buttons[0].callback_data == "content:complete:1"
-    assert buttons[1].callback_data == "content:rate:2"
+    assert buttons[1].callback_data == "content:comment:1"
+    assert buttons[2].callback_data == "content:rate:2"
+    assert buttons[3].callback_data == "content:comment:2"

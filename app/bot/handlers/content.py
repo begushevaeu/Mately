@@ -463,6 +463,66 @@ async def handle_complete_content(callback: CallbackQuery, state: FSMContext, se
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("content:comment:"))
+async def handle_start_content_comment(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    result = await ensure_content_access_for_callback(callback, session)
+    if result is None or callback.message is None or callback.data is None:
+        return
+
+    try:
+        content_id = int(callback.data.rsplit(":", maxsplit=1)[-1])
+    except ValueError:
+        await callback.answer("Не смогла понять контент.", show_alert=True)
+        return
+
+    await remember_content_panel_in_state(state, callback.message)
+    await state.update_data(content_id=content_id)
+    await state.set_state(ContentStates.waiting_for_comment)
+    await edit_content_panel(
+        callback.message,
+        "🎬 <b>Комментарий</b>\n\nНапиши комментарий одним сообщением.",
+        build_content_cancel_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.message(ContentStates.waiting_for_comment)
+async def handle_content_comment(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_content_access_for_message(message, session)
+    if result is None:
+        return
+
+    await add_content_block_messages(session, result.user, message.chat.id, [message])
+    await delete_user_message(bot, message)
+    data = await state.get_data()
+    content_id = data.get("content_id")
+    try:
+        if content_id is None:
+            raise ValueError
+        service = ContentService(session)
+        await service.add_comment(result.user, content_id=content_id, text=message.text or "")
+        context, items = await service.list_items(result.user)
+        item = next((item for item in items if item.id == content_id), None)
+        if item is None:
+            raise ContentServiceError("Контент не найден")
+    except (ValueError, ContentServiceError) as error:
+        await edit_content_panel_from_state(
+            bot,
+            state,
+            f"🎬 <b>Комментарий</b>\n\n{escape(str(error))}. Напиши комментарий ещё раз.",
+            build_content_cancel_keyboard(),
+        )
+        return
+
+    await edit_content_panel_from_state(
+        bot,
+        state,
+        f"✅ <b>Комментарий добавлен</b>\n\n{await service.build_content_card(context, item)}",
+        build_content_list_keyboard([item]),
+    )
+    await state.clear()
+
+
 @router.callback_query(F.data.startswith("content:rate:"))
 async def handle_start_content_rating(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     result = await ensure_content_access_for_callback(callback, session)

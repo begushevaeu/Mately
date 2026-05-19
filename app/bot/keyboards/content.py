@@ -55,9 +55,19 @@ def build_content_list_keyboard(items: list[ContentItem]) -> InlineKeyboardMarku
     keyboard = []
     for index, item in enumerate(items, start=1):
         if item.status == "COMPLETED":
-            keyboard.append([InlineKeyboardButton(text=f"Оценить #{index}", callback_data=f"content:rate:{item.id}")])
+            keyboard.append(
+                [
+                    InlineKeyboardButton(text=f"Оценить #{index}", callback_data=f"content:rate:{item.id}"),
+                    InlineKeyboardButton(text=f"Комментарий #{index}", callback_data=f"content:comment:{item.id}"),
+                ]
+            )
         else:
-            keyboard.append([InlineKeyboardButton(text=f"Готово #{index}", callback_data=f"content:complete:{item.id}")])
+            keyboard.append(
+                [
+                    InlineKeyboardButton(text=f"Готово #{index}", callback_data=f"content:complete:{item.id}"),
+                    InlineKeyboardButton(text=f"Комментарий #{index}", callback_data=f"content:comment:{item.id}"),
+                ]
+            )
 
     keyboard.append([InlineKeyboardButton(text="Назад к контенту", callback_data=CONTENT_MENU_CALLBACK)])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

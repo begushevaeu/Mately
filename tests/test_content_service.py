@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.models import ContentItem, Couple, CoupleMember, PartnerAlias, Rating, User
+from app.models import Comment, ContentItem, Couple, CoupleMember, PartnerAlias, Rating, User
 from app.services.content import (
     ContentCategory,
     ContentListFilter,
@@ -40,8 +40,10 @@ class FakeCoupleRepository:
 class FakeContentRepository:
     items: dict[int, ContentItem] = field(default_factory=dict)
     ratings: list[Rating] = field(default_factory=list)
+    comments: list[Comment] = field(default_factory=list)
     next_id: int = 1
     next_rating_id: int = 1
+    next_comment_id: int = 1
 
     async def create(self, *, title: str, category: str, added_by: int) -> ContentItem:
         item = ContentItem(id=self.next_id, title=title, category=category, added_by=added_by, status="NOT_COMPLETED")
@@ -53,12 +55,14 @@ class FakeContentRepository:
         item = self.items.get(content_id)
         if item is not None:
             item.ratings = [rating for rating in self.ratings if rating.content_id == item.id]
+            item.comments = [comment for comment in self.comments if comment.content_id == item.id]
         return item
 
     async def list_for_users(self, user_ids: list[int]) -> list[ContentItem]:
         items = [item for item in self.items.values() if item.added_by in user_ids]
         for item in items:
             item.ratings = [rating for rating in self.ratings if rating.content_id == item.id]
+            item.comments = [comment for comment in self.comments if comment.content_id == item.id]
         return items
 
     async def mark_completed(self, item: ContentItem, *, completed_at: datetime) -> ContentItem:
@@ -85,6 +89,18 @@ class FakeContentRepository:
             rating.score = score
             rating.emoji = emoji
         return rating
+
+    async def add_comment(self, *, content_id: int, user_id: int, text: str) -> Comment:
+        comment = Comment(
+            id=self.next_comment_id,
+            content_id=content_id,
+            user_id=user_id,
+            text=text,
+            created_at=datetime(2026, 5, 19, 10, self.next_comment_id, tzinfo=timezone.utc),
+        )
+        self.next_comment_id += 1
+        self.comments.append(comment)
+        return comment
 
 
 @dataclass(slots=True)
@@ -125,6 +141,22 @@ async def test_content_can_be_added_completed_and_rated() -> None:
     assert rating.emoji == "🔥"
     assert items == [item]
     assert average_rating(items[0]) == 10
+
+
+@pytest.mark.asyncio
+async def test_both_partners_can_comment_and_card_shows_chronological_comments() -> None:
+    service, creator, partner, _ = build_service()
+    item = await service.add_item(creator, category=ContentCategory.MOVIE, title="Интерстеллар")
+
+    first_comment = await service.add_comment(creator, content_id=item.id, text=" Очень красиво ")
+    second_comment = await service.add_comment(partner, content_id=item.id, text="И музыка <3")
+    context, items = await service.list_items(creator)
+    card = await service.build_content_card(context, items[0])
+
+    assert first_comment.text == "Очень красиво"
+    assert second_comment.text == "И музыка <3"
+    assert "Комментарии:" in card
+    assert card.index("• ты: Очень красиво") < card.index("• Two: И музыка &lt;3")
 
 
 @pytest.mark.asyncio
