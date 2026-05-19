@@ -12,6 +12,7 @@ from app.services.tasks import (
     TaskCreationInput,
     TaskService,
     TaskServiceError,
+    build_task_summary,
     parse_task_deadline,
 )
 
@@ -200,9 +201,34 @@ async def test_partner_aliases_are_used_in_notifications_and_cards() -> None:
     card = await service.build_task_card(context, result.task, show_ownership=True)
 
     assert result.notification_text == "От 🐵Обезьянки: тебе назначили задачу «Помыть пол»."
-    assert "🧹 <b>Помыть пол</b>" in card
+    assert "🐻 <b>Помыть пол</b>" in card
     assert "От: тебя" in card
     assert "Кому: 🥒Огурчику" in card
+
+
+def test_task_title_emoji_rotates_by_task_id() -> None:
+    for task_id, expected_emoji in [
+        (1, "🐻"),
+        (2, "🐱"),
+        (3, "🐶"),
+        (4, "🐭"),
+        (5, "🦊"),
+        (6, "🐻"),
+    ]:
+        task = Task(
+            id=task_id,
+            title=f"Задача {task_id}",
+            created_by=1,
+            assigned_to=1,
+            status="ASSIGNED",
+            is_recurring=False,
+            recurrence_type=None,
+            deadline=None,
+        )
+
+        assert build_task_summary(task, "Europe/Moscow").startswith(
+            f"{expected_emoji} <b>Задача {task_id}</b>"
+        )
 
 
 def test_parse_task_deadline_understands_common_inputs() -> None:

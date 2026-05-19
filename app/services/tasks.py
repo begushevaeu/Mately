@@ -14,7 +14,7 @@ from app.repositories.tasks import TaskRepository
 from app.services.partner_aliases import DisplayName, PartnerAliasService
 from app.utils.dates import format_deadline, parse_deadline
 
-TASK_TITLE_EMOJI = "🧹"
+TASK_TITLE_EMOJIS = ("🐻", "🐱", "🐶", "🐭", "🦊")
 
 
 class TaskServiceError(ValueError):
@@ -74,6 +74,11 @@ def parse_task_deadline(value: str, couple: Couple) -> datetime | None:
     return parse_deadline(value=value, timezone_name=couple.timezone)
 
 
+def get_task_title_emoji(task: Task) -> str:
+    task_id = task.id or 1
+    return TASK_TITLE_EMOJIS[(task_id - 1) % len(TASK_TITLE_EMOJIS)]
+
+
 def build_task_summary(task: Task, timezone_name: str) -> str:
     status_label = {
         "OPEN": "в ярмарке",
@@ -87,7 +92,7 @@ def build_task_summary(task: Task, timezone_name: str) -> str:
         recurring_label = f"\nПовтор: {task.recurrence_type.lower()}"
 
     return (
-        f"{TASK_TITLE_EMOJI} <b>{escape(task.title)}</b>\n"
+        f"{get_task_title_emoji(task)} <b>{escape(task.title)}</b>\n"
         f"Статус: {status_label}\n"
         f"Срок: {format_deadline(task.deadline, timezone_name)}"
         f"{recurring_label}"
