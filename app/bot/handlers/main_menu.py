@@ -8,7 +8,6 @@ from app.bot.keyboards.main_menu import (
     SETTINGS_BUTTON,
     SHOPPING_BUTTON,
     STATISTICS_BUTTON,
-    TASKS_BUTTON,
     build_main_menu,
 )
 from app.services.couples import OnboardingResult, OnboardingStatus
@@ -26,17 +25,6 @@ async def ensure_main_menu_access(message: Message, session: AsyncSession) -> On
         return None
 
     return result
-
-
-@router.message(F.text == TASKS_BUTTON)
-async def handle_tasks_menu(message: Message, session: AsyncSession) -> None:
-    if await ensure_main_menu_access(message, session) is None:
-        return
-
-    await message.answer(
-        "Задачи скоро появятся здесь. Следующим шагом я добавлю создание, назначение и общий пул задач.",
-        reply_markup=build_main_menu(),
-    )
 
 
 @router.message(F.text == CONTENT_BUTTON)

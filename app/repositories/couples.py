@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Couple, CoupleMember
+from app.models import Couple, CoupleMember, User
 
 
 class CoupleRepository:
@@ -22,6 +22,15 @@ class CoupleRepository:
             select(func.count(CoupleMember.id)).where(CoupleMember.couple_id == couple_id)
         )
         return result.scalar_one()
+
+    async def get_users_for_couple(self, couple_id: int) -> list[User]:
+        result = await self.session.execute(
+            select(User)
+            .join(CoupleMember, CoupleMember.user_id == User.id)
+            .where(CoupleMember.couple_id == couple_id)
+            .order_by(CoupleMember.id)
+        )
+        return list(result.scalars().all())
 
     async def get_by_invite_code(self, invite_code: str) -> Couple | None:
         result = await self.session.execute(select(Couple).where(Couple.invite_code == invite_code))
