@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text, false
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -20,6 +20,10 @@ class Task(CreatedAtMixin, Base):
             "recurrence_type is null or recurrence_type in ('DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM')",
             name="task_recurrence_type",
         ),
+        CheckConstraint(
+            "recurrence_interval_days is null or recurrence_interval_days > 0",
+            name="task_recurrence_interval_days_positive",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -28,6 +32,7 @@ class Task(CreatedAtMixin, Base):
     assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     recurrence_type: Mapped[str | None] = mapped_column(String(32))
+    recurrence_interval_days: Mapped[int | None] = mapped_column(Integer)
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="OPEN", index=True)
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -13,6 +13,8 @@ from app.services.tasks import (
     TaskService,
     TaskServiceError,
     build_task_summary,
+    calculate_next_recurrence_deadline,
+    format_recurrence_label,
     parse_task_deadline,
 )
 
@@ -158,6 +160,88 @@ async def test_pool_task_can_be_claimed_and_completed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_completing_recurring_task_creates_next_occurrence() -> None:
+    service, creator, partner, task_repository = build_service()
+    created = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="Полить цветы",
+            is_recurring=True,
+            recurrence_type=RecurrenceType.DAILY,
+            assignment_type=AssignmentType.PARTNER,
+            deadline=datetime(2099, 1, 1, 20, 59, tzinfo=timezone.utc),
+        ),
+    )
+
+    completed = await service.complete_task(partner, created.task.id)
+    next_task = completed.next_task
+
+    assert completed.task.status == "COMPLETED"
+    assert next_task is not None
+    assert next_task.id == 2
+    assert next_task.title == "Полить цветы"
+    assert next_task.created_by == creator.id
+    assert next_task.assigned_to == partner.id
+    assert next_task.status == "ASSIGNED"
+    assert next_task.is_recurring is True
+    assert next_task.recurrence_type == RecurrenceType.DAILY
+    assert next_task.deadline == datetime(2099, 1, 2, 20, 59, tzinfo=timezone.utc)
+    assert task_repository.history[-5:] == [
+        (created.task.id, "COMPLETED", partner.id),
+        (next_task.id, "CREATED", partner.id),
+        (next_task.id, "ASSIGNED", partner.id),
+        (next_task.id, "RECURRENCE_CREATED", partner.id),
+        (created.task.id, "RECURRENCE_CREATED", partner.id),
+    ]
+
+
+def test_monthly_recurrence_clamps_deadline_to_last_day() -> None:
+    task = Task(
+        id=1,
+        title="Оплатить счета",
+        created_by=1,
+        assigned_to=1,
+        status="ASSIGNED",
+        is_recurring=True,
+        recurrence_type=RecurrenceType.MONTHLY,
+        recurrence_interval_days=None,
+        deadline=datetime(2099, 1, 31, 20, 59, tzinfo=timezone.utc),
+    )
+
+    assert calculate_next_recurrence_deadline(task, "Europe/Moscow") == datetime(
+        2099,
+        2,
+        28,
+        20,
+        59,
+        tzinfo=timezone.utc,
+    )
+
+
+def test_custom_recurrence_uses_interval_days() -> None:
+    task = Task(
+        id=1,
+        title="Поменять полотенца",
+        created_by=1,
+        assigned_to=1,
+        status="ASSIGNED",
+        is_recurring=True,
+        recurrence_type=RecurrenceType.CUSTOM,
+        recurrence_interval_days=3,
+        deadline=datetime(2099, 1, 1, 20, 59, tzinfo=timezone.utc),
+    )
+
+    assert calculate_next_recurrence_deadline(task, "Europe/Moscow") == datetime(
+        2099,
+        1,
+        4,
+        20,
+        59,
+        tzinfo=timezone.utc,
+    )
+
+
+@pytest.mark.asyncio
 async def test_task_from_another_couple_is_not_available() -> None:
     service, creator, _, task_repository = build_service()
     task_repository.tasks[99] = Task(id=99, title="Чужая задача", created_by=999, status="OPEN")
@@ -229,6 +313,14 @@ def test_task_title_emoji_rotates_by_task_id() -> None:
         assert build_task_summary(task, "Europe/Moscow").startswith(
             f"{expected_emoji} <b>Задача {task_id}</b>"
         )
+
+
+def test_recurrence_labels_are_human_readable() -> None:
+    assert format_recurrence_label(RecurrenceType.DAILY, None) == "каждый день"
+    assert format_recurrence_label(RecurrenceType.WEEKLY, None) == "каждую неделю"
+    assert format_recurrence_label(RecurrenceType.MONTHLY, None) == "каждый месяц"
+    assert format_recurrence_label(RecurrenceType.CUSTOM, 3) == "каждые 3 дня"
+    assert format_recurrence_label(RecurrenceType.CUSTOM, 5) == "каждые 5 дней"
 
 
 def test_parse_task_deadline_understands_common_inputs() -> None:

@@ -1,4 +1,5 @@
 import logging
+import re
 from html import escape
 
 from aiogram import Bot, F, Router
@@ -370,7 +371,7 @@ async def handle_task_recurring_choice(callback: CallbackQuery, state: FSMContex
     title = data.get("title", "Новая задача")
     await remember_task_panel_in_state(state, callback.message)
     if callback.data == TASK_CREATE_ONE_TIME_CALLBACK:
-        await state.update_data(is_recurring=False, recurrence_type=None)
+        await state.update_data(is_recurring=False, recurrence_type=None, recurrence_interval_days=None)
         await state.set_state(TaskCreationStates.choosing_assignment)
         partner_button = await get_partner_assignment_button(session, result)
         await edit_task_panel_message(
@@ -401,7 +402,17 @@ async def handle_task_recurrence(callback: CallbackQuery, state: FSMContext, ses
     data = await state.get_data()
     title = data.get("title", "Новая задача")
     await remember_task_panel_in_state(state, callback.message)
-    await state.update_data(recurrence_type=recurrence_type.value)
+    await state.update_data(recurrence_type=recurrence_type.value, recurrence_interval_days=None)
+    if recurrence_type is RecurrenceType.CUSTOM:
+        await state.set_state(TaskCreationStates.waiting_for_custom_interval)
+        await edit_task_panel_message(
+            callback.message,
+            f"➕ <b>{escape(title)}</b>\n\nЧерез сколько дней повторять? Напиши число от 1 до 365.",
+            build_task_creation_cancel_keyboard(),
+        )
+        await callback.answer()
+        return
+
     await state.set_state(TaskCreationStates.choosing_assignment)
     partner_button = await get_partner_assignment_button(session, result)
     await edit_task_panel_message(
@@ -410,6 +421,38 @@ async def handle_task_recurrence(callback: CallbackQuery, state: FSMContext, ses
         build_assignment_keyboard(partner_button),
     )
     await callback.answer()
+
+
+@router.message(TaskCreationStates.waiting_for_custom_interval)
+async def handle_task_custom_interval(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_task_access_for_message(message, session)
+    if result is None:
+        return
+
+    await add_task_block_messages(session, result.user, message.chat.id, [message])
+    await delete_user_message(bot, message)
+    data = await state.get_data()
+    title = data.get("title", "Новая задача")
+    match = re.search(r"\d+", message.text or "")
+    interval_days = int(match.group()) if match else 0
+    if interval_days < 1 or interval_days > 365:
+        await edit_task_panel_from_state(
+            bot,
+            state,
+            f"➕ <b>{escape(title)}</b>\n\nНапиши число дней от 1 до 365.",
+            build_task_creation_cancel_keyboard(),
+        )
+        return
+
+    await state.update_data(recurrence_interval_days=interval_days)
+    await state.set_state(TaskCreationStates.choosing_assignment)
+    partner_button = await get_partner_assignment_button(session, result)
+    await edit_task_panel_from_state(
+        bot,
+        state,
+        f"➕ <b>{escape(title)}</b>\n\nКому назначить задачу?",
+        build_assignment_keyboard(partner_button),
+    )
 
 
 @router.callback_query(F.data.in_(set(ASSIGNMENT_BY_CALLBACK)))
@@ -453,6 +496,7 @@ async def handle_task_deadline_choice(
         recurrence_type=RecurrenceType(data["recurrence_type"]) if data.get("recurrence_type") else None,
         assignment_type=AssignmentType(data["assignment_type"]),
         deadline=deadline,
+        recurrence_interval_days=data.get("recurrence_interval_days"),
     )
     await finish_task_creation(
         bot=bot,
@@ -524,6 +568,7 @@ async def handle_task_deadline(
         recurrence_type=RecurrenceType(data["recurrence_type"]) if data.get("recurrence_type") else None,
         assignment_type=AssignmentType(data["assignment_type"]),
         deadline=deadline,
+        recurrence_interval_days=data.get("recurrence_interval_days"),
     )
     await finish_task_creation(
         bot=bot,
@@ -606,9 +651,17 @@ async def handle_task_mutation(callback: CallbackQuery, session: AsyncSession, b
     service = TaskService(session)
     context = await service.get_context(result.user)
     keyboard = await build_tasks_menu_for_user(session, result.user)
+    panel_text = f"✅ <b>{answer_text}</b>\n\n{await service.build_task_card(context, mutation_result.task, show_ownership=True)}"
+    if mutation_result.next_task is not None:
+        panel_text = (
+            f"{panel_text}\n\n"
+            f"🔁 <b>Следующий повтор создан</b>\n\n"
+            f"{await service.build_task_card(context, mutation_result.next_task, show_ownership=True)}"
+        )
+
     await edit_task_panel_message(
         callback.message,
-        f"✅ <b>{answer_text}</b>\n\n{await service.build_task_card(context, mutation_result.task, show_ownership=True)}",
+        panel_text,
         keyboard,
     )
     await callback.answer()

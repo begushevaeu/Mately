@@ -55,6 +55,7 @@ def test_core_uniqueness_constraints_are_declared() -> None:
 
 def test_status_and_rating_check_constraints_are_declared() -> None:
     assert "ck_tasks_task_status" in constraint_names("tasks", CheckConstraint)
+    assert "ck_tasks_task_recurrence_interval_days_positive" in constraint_names("tasks", CheckConstraint)
     assert "ck_shopping_items_shopping_item_status" in constraint_names("shopping_items", CheckConstraint)
     assert "ck_content_items_content_item_status" in constraint_names("content_items", CheckConstraint)
     assert "ck_ratings_rating_score_range" in constraint_names("ratings", CheckConstraint)
@@ -72,7 +73,9 @@ def test_foreign_keys_have_explicit_ondelete_rules() -> None:
 def test_shopping_and_notification_fields_support_required_flows() -> None:
     shopping_columns = Base.metadata.tables["shopping_items"].columns
     notification_columns = Base.metadata.tables["notifications"].columns
+    task_columns = Base.metadata.tables["tasks"].columns
 
+    assert "recurrence_interval_days" in task_columns
     assert {"status", "completed_at", "archived_at"}.issubset(shopping_columns.keys())
     assert {"status", "scheduled_at", "delivered_at", "dedupe_key"}.issubset(notification_columns.keys())
     assert "ix_shopping_items_archived_at" in index_names("shopping_items")

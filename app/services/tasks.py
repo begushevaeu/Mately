@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from calendar import monthrange
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from html import escape
 
@@ -12,7 +13,7 @@ from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
 from app.repositories.tasks import TaskRepository
 from app.services.partner_aliases import DisplayName, PartnerAliasService
-from app.utils.dates import format_deadline, parse_deadline
+from app.utils.dates import format_deadline, get_timezone, parse_deadline
 
 TASK_TITLE_EMOJIS = ("🐻", "🐱", "🐶", "🐭", "🦊")
 
@@ -41,6 +42,7 @@ class TaskCreationInput:
     recurrence_type: RecurrenceType | None
     assignment_type: AssignmentType
     deadline: datetime | None
+    recurrence_interval_days: int | None = None
 
 
 @dataclass(slots=True)
@@ -48,6 +50,7 @@ class TaskMutationResult:
     task: Task
     notification_user: User | None = None
     notification_text: str | None = None
+    next_task: Task | None = None
 
 
 @dataclass(slots=True)
@@ -79,6 +82,86 @@ def get_task_title_emoji(task: Task) -> str:
     return TASK_TITLE_EMOJIS[(task_id - 1) % len(TASK_TITLE_EMOJIS)]
 
 
+def format_recurrence_label(recurrence_type: str, interval_days: int | None) -> str:
+    if recurrence_type == RecurrenceType.DAILY:
+        return "каждый день"
+    if recurrence_type == RecurrenceType.WEEKLY:
+        return "каждую неделю"
+    if recurrence_type == RecurrenceType.MONTHLY:
+        return "каждый месяц"
+    if recurrence_type == RecurrenceType.CUSTOM and interval_days is not None:
+        return format_custom_interval(interval_days)
+    return "другой интервал"
+
+
+def format_custom_interval(interval_days: int) -> str:
+    if interval_days == 1:
+        return "каждый день"
+
+    last_two_digits = interval_days % 100
+    if 11 <= last_two_digits <= 14:
+        day_word = "дней"
+    elif interval_days % 10 == 1:
+        day_word = "день"
+    elif 2 <= interval_days % 10 <= 4:
+        day_word = "дня"
+    else:
+        day_word = "дней"
+
+    return f"каждые {interval_days} {day_word}"
+
+
+def calculate_next_recurrence_deadline(
+    task: Task,
+    timezone_name: str,
+    *,
+    completed_at: datetime | None = None,
+) -> datetime | None:
+    if task.deadline is None or task.recurrence_type is None:
+        return None
+
+    recurrence_type = RecurrenceType(task.recurrence_type)
+    tz = get_timezone(timezone_name)
+    next_deadline = _increment_recurrence_deadline(
+        task.deadline.astimezone(tz),
+        recurrence_type,
+        task.recurrence_interval_days,
+    )
+    local_completed_at = (completed_at or datetime.now(timezone.utc)).astimezone(tz)
+
+    while next_deadline <= local_completed_at:
+        next_deadline = _increment_recurrence_deadline(
+            next_deadline,
+            recurrence_type,
+            task.recurrence_interval_days,
+        )
+
+    return next_deadline.astimezone(timezone.utc)
+
+
+def _increment_recurrence_deadline(
+    deadline: datetime,
+    recurrence_type: RecurrenceType,
+    interval_days: int | None,
+) -> datetime:
+    if recurrence_type is RecurrenceType.MONTHLY:
+        return _add_month(deadline)
+
+    days_by_type = {
+        RecurrenceType.DAILY: 1,
+        RecurrenceType.WEEKLY: 7,
+        RecurrenceType.CUSTOM: interval_days or 1,
+    }
+    return deadline + timedelta(days=days_by_type[recurrence_type])
+
+
+def _add_month(value: datetime) -> datetime:
+    year = value.year + (value.month // 12)
+    month = (value.month % 12) + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
 def build_task_summary(task: Task, timezone_name: str) -> str:
     status_label = {
         "OPEN": "в ярмарке",
@@ -89,7 +172,7 @@ def build_task_summary(task: Task, timezone_name: str) -> str:
     }.get(task.status, task.status)
     recurring_label = ""
     if task.is_recurring and task.recurrence_type is not None:
-        recurring_label = f"\nПовтор: {task.recurrence_type.lower()}"
+        recurring_label = f"\nПовтор: {format_recurrence_label(task.recurrence_type, task.recurrence_interval_days)}"
 
     return (
         f"{get_task_title_emoji(task)} <b>{escape(task.title)}</b>\n"
@@ -137,6 +220,7 @@ class TaskService:
             assigned_to=assigned_to,
             is_recurring=creation_input.is_recurring,
             recurrence_type=creation_input.recurrence_type.value if creation_input.recurrence_type else None,
+            recurrence_interval_days=creation_input.recurrence_interval_days,
             deadline=creation_input.deadline,
             status=status,
             assigned_at=assigned_at,
@@ -196,10 +280,18 @@ class TaskService:
 
         task = await self.tasks.complete(task)
         await self.tasks.add_history(task_id=task.id, event_type="COMPLETED", actor_id=current_user.id)
+        next_task = await self._create_next_recurring_task(context=context, task=task, actor_id=current_user.id)
         partner = context.partner
         actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
         notification_text = f"{actor_label.nominative_with_emoji} выполнил(а) задачу «{task.title}»."
-        return TaskMutationResult(task=task, notification_user=partner, notification_text=notification_text)
+        if next_task is not None:
+            notification_text = f"{notification_text} Следующий повтор уже создан."
+        return TaskMutationResult(
+            task=task,
+            notification_user=partner,
+            notification_text=notification_text,
+            next_task=next_task,
+        )
 
     async def build_task_card(self, context: CoupleTaskContext, task: Task, *, show_ownership: bool = False) -> str:
         card = build_task_summary(task, context.couple.timezone)
@@ -232,6 +324,45 @@ class TaskService:
             raise TaskServiceError("Task not found")
 
         return task
+
+    async def _create_next_recurring_task(
+        self,
+        *,
+        context: CoupleTaskContext,
+        task: Task,
+        actor_id: int,
+    ) -> Task | None:
+        if not task.is_recurring or task.recurrence_type is None:
+            return None
+
+        assigned_at = datetime.now(timezone.utc) if task.assigned_to is not None else None
+        next_task = await self.tasks.create(
+            title=task.title,
+            created_by=task.created_by,
+            assigned_to=task.assigned_to,
+            is_recurring=True,
+            recurrence_type=task.recurrence_type,
+            recurrence_interval_days=task.recurrence_interval_days,
+            deadline=calculate_next_recurrence_deadline(task, context.couple.timezone, completed_at=task.completed_at),
+            status="ASSIGNED" if task.assigned_to is not None else "OPEN",
+            assigned_at=assigned_at,
+        )
+        await self.tasks.add_history(task_id=next_task.id, event_type="CREATED", actor_id=actor_id)
+        if next_task.assigned_to is not None:
+            await self.tasks.add_history(task_id=next_task.id, event_type="ASSIGNED", actor_id=actor_id)
+        await self.tasks.add_history(
+            task_id=next_task.id,
+            event_type="RECURRENCE_CREATED",
+            actor_id=actor_id,
+            details=f"source_task_id={task.id}",
+        )
+        await self.tasks.add_history(
+            task_id=task.id,
+            event_type="RECURRENCE_CREATED",
+            actor_id=actor_id,
+            details=f"next_task_id={next_task.id}",
+        )
+        return next_task
 
     async def _actor_line(self, context: CoupleTaskContext, user_id: int, *, case: str) -> str:
         if user_id == context.current_user.id:
