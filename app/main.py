@@ -7,6 +7,7 @@ from app.bot.middlewares.database import DatabaseSessionMiddleware
 from app.core.config import get_settings
 from app.core.database import async_session_maker
 from app.core.logger import configure_logging
+from app.schedulers.shopping import setup_shopping_cleanup_scheduler
 
 
 async def main() -> None:
@@ -18,7 +19,11 @@ async def main() -> None:
     dispatcher.update.middleware(DatabaseSessionMiddleware(async_session_maker))
     dispatcher.include_router(router)
 
-    await dispatcher.start_polling(bot)
+    scheduler = setup_shopping_cleanup_scheduler(async_session_maker)
+    try:
+        await dispatcher.start_polling(bot)
+    finally:
+        scheduler.shutdown(wait=False)
 
 
 if __name__ == "__main__":

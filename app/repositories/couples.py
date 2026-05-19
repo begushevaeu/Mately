@@ -36,6 +36,10 @@ class CoupleRepository:
         result = await self.session.execute(select(Couple).where(Couple.invite_code == invite_code))
         return result.scalar_one_or_none()
 
+    async def list_all(self) -> list[Couple]:
+        result = await self.session.execute(select(Couple).order_by(Couple.id))
+        return list(result.scalars().all())
+
     async def create(self, invite_code: str, invite_expires_at, timezone: str) -> Couple:
         couple = Couple(
             invite_code=invite_code,

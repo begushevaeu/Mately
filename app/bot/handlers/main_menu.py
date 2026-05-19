@@ -6,7 +6,6 @@ from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current
 from app.bot.keyboards.main_menu import (
     CONTENT_BUTTON,
     SETTINGS_BUTTON,
-    SHOPPING_BUTTON,
     STATISTICS_BUTTON,
     build_main_menu,
 )
@@ -14,7 +13,6 @@ from app.bot.keyboards.settings import build_settings_keyboard
 from app.services.chat_blocks import (
     CONTENT_BLOCK_KEY,
     SETTINGS_BLOCK_KEY,
-    SHOPPING_BLOCK_KEY,
     STATISTICS_BLOCK_KEY,
     ChatBlockService,
 )
@@ -75,23 +73,6 @@ async def handle_content_menu(message: Message, session: AsyncSession, bot: Bot)
         result=result,
         block_key=CONTENT_BLOCK_KEY,
         text="Контент будет жить здесь: фильмы, книги, сериалы и оценки. Раздел подключим после задач и покупок.",
-        reply_markup=build_main_menu(),
-    )
-
-
-@router.message(F.text == SHOPPING_BUTTON)
-async def handle_shopping_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
-    result = await ensure_main_menu_access(message, session)
-    if result is None:
-        return
-
-    await show_main_menu_block(
-        message=message,
-        session=session,
-        bot=bot,
-        result=result,
-        block_key=SHOPPING_BLOCK_KEY,
-        text="Список покупок будет здесь. В ближайшем шаге добавлю добавление пунктов и отметку «куплено».",
         reply_markup=build_main_menu(),
     )
 
