@@ -128,7 +128,14 @@ async def add_task_block_messages(session: AsyncSession, user, chat_id: int, mes
     )
 
 
-async def reset_and_show_tasks_menu(message: Message, session: AsyncSession, bot: Bot, result: OnboardingResult) -> None:
+async def reset_and_show_tasks_menu(
+    message: Message,
+    session: AsyncSession,
+    bot: Bot,
+    result: OnboardingResult,
+    *,
+    trigger_message: Message | None = None,
+) -> None:
     await ChatBlockService(session).reset_block(
         bot=bot,
         user=result.user,
@@ -140,11 +147,15 @@ async def reset_and_show_tasks_menu(message: Message, session: AsyncSession, bot
         await message.answer("Задачи", reply_markup=build_main_menu()),
         await message.answer("Что делаем?", reply_markup=keyboard),
     ]
+    messages_to_remember = [*sent_messages]
+    if trigger_message is not None:
+        messages_to_remember.insert(0, trigger_message)
+
     await ChatBlockService(session).remember_messages(
         user=result.user,
         chat_id=message.chat.id,
         block_key=TASKS_BLOCK_KEY,
-        messages=sent_messages,
+        messages=messages_to_remember,
     )
 
 
@@ -163,7 +174,7 @@ async def handle_tasks_menu(message: Message, session: AsyncSession, bot: Bot) -
     if result is None:
         return
 
-    await reset_and_show_tasks_menu(message, session, bot, result)
+    await reset_and_show_tasks_menu(message, session, bot, result, trigger_message=message)
 
 
 @router.callback_query(F.data == TASKS_MENU_CALLBACK)
