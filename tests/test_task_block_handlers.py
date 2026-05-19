@@ -52,8 +52,12 @@ async def test_tasks_block_remembers_user_trigger_message(monkeypatch: pytest.Mo
     async def fake_build_tasks_menu_for_user(*_args, **_kwargs):
         return None
 
+    async def fake_build_tasks_panel_text(*_args, **_kwargs):
+        return "Задачи"
+
     monkeypatch.setattr(tasks, "ChatBlockService", FakeChatBlockService)
     monkeypatch.setattr(tasks, "build_tasks_menu_for_user", fake_build_tasks_menu_for_user)
+    monkeypatch.setattr(tasks, "build_tasks_panel_text", fake_build_tasks_panel_text)
 
     await tasks.reset_and_show_tasks_menu(
         trigger_message,
@@ -63,4 +67,4 @@ async def test_tasks_block_remembers_user_trigger_message(monkeypatch: pytest.Mo
         trigger_message=trigger_message,
     )
 
-    assert FakeChatBlockService.remembered_message_ids == [42, 1000, 1001]
+    assert FakeChatBlockService.remembered_message_ids == [42, 1000]
