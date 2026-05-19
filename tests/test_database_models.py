@@ -4,9 +4,11 @@ from app.models import Base
 
 
 EXPECTED_TABLES = {
+    "chat_blocks",
     "users",
     "couples",
     "couple_members",
+    "partner_aliases",
     "tasks",
     "task_history",
     "shopping_items",
@@ -45,6 +47,8 @@ def test_core_uniqueness_constraints_are_declared() -> None:
     assert "uq_users_telegram_id" in constraint_names("users", UniqueConstraint)
     assert "uq_couples_invite_code" in constraint_names("couples", UniqueConstraint)
     assert "uq_couple_members_user_id" in constraint_names("couple_members", UniqueConstraint)
+    assert "uq_partner_aliases_owner_partner" in constraint_names("partner_aliases", UniqueConstraint)
+    assert "uq_chat_blocks_user_chat_block" in constraint_names("chat_blocks", UniqueConstraint)
     assert "uq_ratings_content_user" in constraint_names("ratings", UniqueConstraint)
     assert "uq_notifications_dedupe_key" in constraint_names("notifications", UniqueConstraint)
 

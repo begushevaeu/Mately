@@ -27,17 +27,19 @@ TOMORROW_DEADLINE_BUTTON = "Завтра"
 NO_DEADLINE_BUTTON = "Без срока"
 
 
-def build_tasks_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def build_tasks_menu(*, has_pool_tasks: bool = False) -> InlineKeyboardMarkup:
+    keyboard = []
+    if has_pool_tasks:
+        keyboard.append([InlineKeyboardButton(text="Ярмарка задач", callback_data=TASK_POOL_CALLBACK)])
+
+    keyboard.extend(
+        [
             [InlineKeyboardButton(text="Добавить задачу", callback_data=ADD_TASK_CALLBACK)],
-            [
-                InlineKeyboardButton(text="Мои задачи", callback_data=MY_TASKS_CALLBACK),
-                InlineKeyboardButton(text="Ярмарка задач", callback_data=TASK_POOL_CALLBACK),
-            ],
+            [InlineKeyboardButton(text="Мои задачи", callback_data=MY_TASKS_CALLBACK)],
             [InlineKeyboardButton(text="Все активные", callback_data=ALL_TASKS_CALLBACK)],
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def build_task_actions(task_id: int, *, can_claim: bool) -> InlineKeyboardMarkup:
@@ -72,10 +74,11 @@ def build_recurrence_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def build_assignment_keyboard() -> ReplyKeyboardMarkup:
+def build_assignment_keyboard(partner_button_text: str | None = None) -> ReplyKeyboardMarkup:
+    partner_button_text = partner_button_text or ASSIGN_PARTNER_BUTTON
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=ASSIGN_SELF_BUTTON), KeyboardButton(text=ASSIGN_PARTNER_BUTTON)],
+            [KeyboardButton(text=ASSIGN_SELF_BUTTON), KeyboardButton(text=partner_button_text)],
             [KeyboardButton(text=ASSIGN_POOL_BUTTON)],
             [KeyboardButton(text=CANCEL_BUTTON)],
         ],

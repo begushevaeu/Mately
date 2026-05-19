@@ -10,6 +10,7 @@ from app.bot.keyboards.main_menu import (
     STATISTICS_BUTTON,
     build_main_menu,
 )
+from app.bot.keyboards.settings import build_settings_keyboard
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 router = Router()
@@ -71,7 +72,7 @@ async def handle_settings_menu(message: Message, session: AsyncSession) -> None:
         "Настройки Mately\n\n"
         f"Часовой пояс пары: {timezone}\n"
         "Доступные команды: /menu, /cancel, /help",
-        reply_markup=build_main_menu(),
+        reply_markup=build_settings_keyboard(),
     )
 
 

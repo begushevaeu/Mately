@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.models import Couple, CoupleMember, Task, User
+from app.models import Couple, CoupleMember, PartnerAlias, Task, User
 from app.services.tasks import (
     AssignmentType,
     RecurrenceType,
@@ -86,7 +86,22 @@ class FakeTaskRepository:
         return task
 
 
-def build_service() -> tuple[TaskService, User, User, FakeTaskRepository]:
+@dataclass(slots=True)
+class FakePartnerAliasRepository:
+    aliases: dict[tuple[int, int], PartnerAlias] = field(default_factory=dict)
+
+    async def get(self, owner_user_id: int, partner_user_id: int):
+        return self.aliases.get((owner_user_id, partner_user_id))
+
+    async def upsert(self, **kwargs):
+        alias = PartnerAlias(**kwargs)
+        self.aliases[(kwargs["owner_user_id"], kwargs["partner_user_id"])] = alias
+        return alias
+
+
+def build_service(
+    alias_repository: FakePartnerAliasRepository | None = None,
+) -> tuple[TaskService, User, User, FakeTaskRepository]:
     creator = User(id=1, telegram_id=100, username="one", first_name="One")
     partner = User(id=2, telegram_id=200, username="two", first_name="Two")
     couple = Couple(id=1, invite_code="ABC12345", timezone="Europe/Moscow")
@@ -94,6 +109,7 @@ def build_service() -> tuple[TaskService, User, User, FakeTaskRepository]:
     service = TaskService(
         couples=FakeCoupleRepository(couple=couple, members=[creator, partner]),
         tasks=task_repository,
+        aliases=alias_repository or FakePartnerAliasRepository(),
     )
     return service, creator, partner, task_repository
 
@@ -147,6 +163,46 @@ async def test_task_from_another_couple_is_not_available() -> None:
 
     with pytest.raises(TaskServiceError):
         await service.complete_task(creator, 99)
+
+
+@pytest.mark.asyncio
+async def test_partner_aliases_are_used_in_notifications_and_cards() -> None:
+    aliases = FakePartnerAliasRepository()
+    service, creator, partner, _ = build_service(aliases)
+    await aliases.upsert(
+        owner_user_id=creator.id,
+        partner_user_id=partner.id,
+        emoji="🥒",
+        nominative="Огурчик",
+        genitive="Огурчика",
+        dative="Огурчику",
+    )
+    await aliases.upsert(
+        owner_user_id=partner.id,
+        partner_user_id=creator.id,
+        emoji="🐵",
+        nominative="Обезьянка",
+        genitive="Обезьянки",
+        dative="Обезьянке",
+    )
+
+    result = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="Помыть пол",
+            is_recurring=False,
+            recurrence_type=None,
+            assignment_type=AssignmentType.PARTNER,
+            deadline=None,
+        ),
+    )
+    context = await service.get_context(creator)
+    card = await service.build_task_card(context, result.task, show_ownership=True)
+
+    assert result.notification_text == "От 🐵 Обезьянки: тебе назначили задачу «Помыть пол»."
+    assert "🧹 <b>Помыть пол</b>" in card
+    assert "От: тебя" in card
+    assert "Кому: 🥒 Огурчику" in card
 
 
 def test_parse_task_deadline_understands_common_inputs() -> None:

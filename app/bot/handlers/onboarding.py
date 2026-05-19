@@ -15,6 +15,7 @@ from app.bot.keyboards.onboarding import (
     build_waiting_for_partner_menu,
 )
 from app.bot.states.onboarding import JoinCoupleStates
+from app.bot.handlers.partner_aliases import maybe_prompt_partner_alias
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 
 router = Router()
@@ -140,3 +141,4 @@ async def handle_invite_code(message: Message, state: FSMContext, session: Async
     joined_result = await CoupleService(session).join_couple(result.user, invite_code)
     await state.clear()
     await answer_for_onboarding_state(message, joined_result)
+    await maybe_prompt_partner_alias(message, joined_result, session, state)
