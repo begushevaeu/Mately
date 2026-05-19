@@ -199,10 +199,10 @@ async def test_partner_aliases_are_used_in_notifications_and_cards() -> None:
     context = await service.get_context(creator)
     card = await service.build_task_card(context, result.task, show_ownership=True)
 
-    assert result.notification_text == "От 🐵 Обезьянки: тебе назначили задачу «Помыть пол»."
+    assert result.notification_text == "От 🐵Обезьянки: тебе назначили задачу «Помыть пол»."
     assert "🧹 <b>Помыть пол</b>" in card
     assert "От: тебя" in card
-    assert "Кому: 🥒 Огурчику" in card
+    assert "Кому: 🥒Огурчику" in card
 
 
 def test_parse_task_deadline_understands_common_inputs() -> None:

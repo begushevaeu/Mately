@@ -23,17 +23,20 @@ class DisplayName:
     genitive: str
     dative: str
 
+    def _with_emoji(self, value: str) -> str:
+        return f"{self.emoji}{value}" if self.emoji else value
+
     @property
     def nominative_with_emoji(self) -> str:
-        return f"{self.emoji} {self.nominative}".strip()
+        return self._with_emoji(self.nominative)
 
     @property
     def genitive_with_emoji(self) -> str:
-        return f"{self.emoji} {self.genitive}".strip()
+        return self._with_emoji(self.genitive)
 
     @property
     def dative_with_emoji(self) -> str:
-        return f"{self.emoji} {self.dative}".strip()
+        return self._with_emoji(self.dative)
 
 
 def normalize_alias_value(value: str, *, max_length: int = 64) -> str:

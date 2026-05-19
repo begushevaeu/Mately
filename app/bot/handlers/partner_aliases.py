@@ -169,6 +169,6 @@ async def handle_partner_alias_dative(message: Message, state: FSMContext, sessi
     )
     await state.clear()
     await message.answer(
-        f"Готово. Теперь партнер будет отображаться как {data['emoji']} {data['nominative']}.",
+        f"Готово. Теперь партнер будет отображаться как {data['emoji']}{data['nominative']}.",
         reply_markup=build_main_menu(),
     )
