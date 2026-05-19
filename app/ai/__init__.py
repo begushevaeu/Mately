@@ -1,0 +1,1 @@
+"""Cozy AI message generation."""

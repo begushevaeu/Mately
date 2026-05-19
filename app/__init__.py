@@ -1,0 +1,1 @@
+"""Mately application package."""
