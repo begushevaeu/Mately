@@ -15,6 +15,7 @@ class Settings(BaseModel):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
     default_timezone: str = Field(default="Europe/Moscow", alias="DEFAULT_TIMEZONE")
+    invite_code_ttl_hours: int = Field(default=168, alias="INVITE_CODE_TTL_HOURS")
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
