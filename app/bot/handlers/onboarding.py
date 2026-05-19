@@ -16,6 +16,7 @@ from app.bot.keyboards.onboarding import (
 )
 from app.bot.states.onboarding import JoinCoupleStates
 from app.bot.handlers.partner_aliases import maybe_prompt_partner_alias
+from app.services.chat_blocks import ONBOARDING_BLOCK_KEY, ChatBlockService
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 
 router = Router()
@@ -79,6 +80,30 @@ async def get_current_onboarding_result(message: Message, session: AsyncSession)
     return await CoupleService(session).start_for_profile(profile)
 
 
+async def remember_onboarding_messages(
+    *,
+    session: AsyncSession,
+    result: OnboardingResult,
+    chat_id: int,
+    messages: list[Message],
+) -> None:
+    await ChatBlockService(session).add_messages(
+        user=result.user,
+        chat_id=chat_id,
+        block_key=ONBOARDING_BLOCK_KEY,
+        messages=messages,
+    )
+
+
+async def reset_onboarding_block(*, session: AsyncSession, bot: Bot, result: OnboardingResult, chat_id: int) -> None:
+    await ChatBlockService(session).reset_block(
+        bot=bot,
+        user=result.user,
+        chat_id=chat_id,
+        block_key=ONBOARDING_BLOCK_KEY,
+    )
+
+
 @router.message(Command("menu"))
 async def handle_menu(message: Message, state: FSMContext, session: AsyncSession) -> None:
     await state.clear()
@@ -119,9 +144,20 @@ async def handle_create_couple(message: Message, session: AsyncSession) -> None:
 
 
 @router.message(F.text == ENTER_INVITE_CODE_BUTTON)
-async def handle_enter_invite_code(message: Message, state: FSMContext) -> None:
+async def handle_enter_invite_code(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
+    result = await get_current_onboarding_result(message, session)
+    if result is None:
+        return
+
+    await reset_onboarding_block(session=session, bot=bot, result=result, chat_id=message.chat.id)
     await state.set_state(JoinCoupleStates.waiting_for_invite_code)
-    await message.answer("Введи код приглашения от партнера.", reply_markup=build_cancel_menu())
+    sent_message = await message.answer("Введи код приглашения от партнера.", reply_markup=build_cancel_menu())
+    await ChatBlockService(session).remember_messages(
+        user=result.user,
+        chat_id=message.chat.id,
+        block_key=ONBOARDING_BLOCK_KEY,
+        messages=[message, sent_message],
+    )
 
 
 @router.message(F.text == REFRESH_STATUS_BUTTON)
@@ -138,7 +174,15 @@ async def handle_invite_code(message: Message, state: FSMContext, session: Async
         return
 
     invite_code = message.text or ""
+    await remember_onboarding_messages(
+        session=session,
+        result=result,
+        chat_id=message.chat.id,
+        messages=[message],
+    )
     joined_result = await CoupleService(session).join_couple(result.user, invite_code)
     await state.clear()
+    if joined_result.status is OnboardingStatus.IN_COUPLE:
+        await reset_onboarding_block(session=session, bot=bot, result=result, chat_id=message.chat.id)
     await answer_for_onboarding_state(message, joined_result)
     await maybe_prompt_partner_alias(message, joined_result, session, state, bot)
