@@ -34,10 +34,22 @@ The repository is initialized with the project structure from `docs/mately_step_
    python -m app.main
    ```
 
+To apply database migrations locally:
+
+```bash
+python -m alembic upgrade head
+```
+
+If local Windows networking blocks direct Python access to the Docker-published database port, run migrations inside Docker instead:
+
+```bash
+docker compose run --rm bot python -m alembic upgrade head
+```
+
 ## Required Environment Variables
 
 - `BOT_TOKEN` - Telegram bot token from BotFather.
-- `DATABASE_URL` - SQLAlchemy async PostgreSQL URL.
+- `DATABASE_URL` - SQLAlchemy async PostgreSQL URL. Use `127.0.0.1` for local Docker on Windows.
 - `OPENAI_API_KEY` - optional for the cozy AI layer.
 - `LOG_LEVEL` - application log level.
 - `SQL_ECHO` - SQLAlchemy query logging toggle.

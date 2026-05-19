@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 class Settings(BaseModel):
     bot_token: SecretStr = Field(default=SecretStr(""), alias="BOT_TOKEN")
     database_url: str = Field(
-        default="postgresql+asyncpg://mately:mately@localhost:5432/mately",
+        default="postgresql+asyncpg://mately:mately@127.0.0.1:5432/mately",
         alias="DATABASE_URL",
     )
     openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
