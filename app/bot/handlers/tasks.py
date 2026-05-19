@@ -624,6 +624,11 @@ async def handle_complete_task(callback: CallbackQuery, session: AsyncSession, b
     await handle_task_mutation(callback, session, bot, action="done")
 
 
+@router.callback_query(F.data.startswith("tasks:archive:"))
+async def handle_archive_task(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    await handle_task_mutation(callback, session, bot, action="archive")
+
+
 async def handle_task_mutation(callback: CallbackQuery, session: AsyncSession, bot: Bot, *, action: str) -> None:
     result = await ensure_task_access_for_callback(callback, session)
     if result is None or result.couple is None or callback.message is None or callback.data is None:
@@ -640,9 +645,12 @@ async def handle_task_mutation(callback: CallbackQuery, session: AsyncSession, b
         if action == "claim":
             mutation_result = await service.claim_task(result.user, task_id)
             answer_text = "Задача теперь твоя."
-        else:
+        elif action == "done":
             mutation_result = await service.complete_task(result.user, task_id)
             answer_text = "Готово. Маленькая бытовая победа засчитана."
+        else:
+            mutation_result = await service.archive_task(result.user, task_id)
+            answer_text = "Повтор остановлен." if mutation_result.task.is_recurring else "Задача удалена."
     except TaskServiceError as error:
         await callback.answer(str(error), show_alert=True)
         return

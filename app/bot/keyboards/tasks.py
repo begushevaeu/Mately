@@ -58,14 +58,23 @@ def build_task_list_keyboard(
 ) -> InlineKeyboardMarkup:
     keyboard = []
     for index, task in enumerate(tasks, start=1):
+        archive_button = InlineKeyboardButton(
+            text=f"{'Остановить повтор' if task.is_recurring else 'Удалить'} #{index}",
+            callback_data=f"tasks:archive:{task.id}",
+        )
         if view == TASK_POOL_CALLBACK:
             keyboard.append([InlineKeyboardButton(text=f"Взять #{index}", callback_data=f"tasks:claim:{task.id}")])
+            keyboard.append([archive_button])
             continue
 
         if task.assigned_to is None:
             keyboard.append([InlineKeyboardButton(text=f"Взять #{index}", callback_data=f"tasks:claim:{task.id}")])
+            keyboard.append([archive_button])
         elif view == MY_TASKS_CALLBACK or task.assigned_to == current_user_id:
             keyboard.append([InlineKeyboardButton(text=f"Готово #{index}", callback_data=f"tasks:done:{task.id}")])
+            keyboard.append([archive_button])
+        else:
+            keyboard.append([archive_button])
 
     keyboard.append([InlineKeyboardButton(text="Назад к задачам", callback_data=TASKS_MENU_CALLBACK)])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

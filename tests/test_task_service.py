@@ -88,6 +88,10 @@ class FakeTaskRepository:
         task.completed_at = datetime.now(timezone.utc)
         return task
 
+    async def archive(self, task: Task) -> Task:
+        task.status = "ARCHIVED"
+        return task
+
 
 @dataclass(slots=True)
 class FakePartnerAliasRepository:
@@ -193,6 +197,53 @@ async def test_completing_recurring_task_creates_next_occurrence() -> None:
         (next_task.id, "RECURRENCE_CREATED", partner.id),
         (created.task.id, "RECURRENCE_CREATED", partner.id),
     ]
+
+
+@pytest.mark.asyncio
+async def test_archive_one_time_task_hides_it_from_active_lists() -> None:
+    service, creator, partner, task_repository = build_service()
+    created = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="Разобрать пакеты",
+            is_recurring=False,
+            recurrence_type=None,
+            assignment_type=AssignmentType.PARTNER,
+            deadline=None,
+        ),
+    )
+
+    archived = await service.archive_task(creator, created.task.id)
+    _, active_tasks = await service.list_all_active(creator)
+
+    assert archived.task.status == "ARCHIVED"
+    assert active_tasks == []
+    assert archived.notification_user is partner
+    assert archived.notification_text == "One удалил(а) задачу «Разобрать пакеты»."
+    assert task_repository.history[-1] == (created.task.id, "ARCHIVED", creator.id)
+
+
+@pytest.mark.asyncio
+async def test_archiving_recurring_task_stops_future_occurrences() -> None:
+    service, creator, partner, task_repository = build_service()
+    created = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="Полить цветы",
+            is_recurring=True,
+            recurrence_type=RecurrenceType.DAILY,
+            assignment_type=AssignmentType.PARTNER,
+            deadline=datetime(2099, 1, 1, 20, 59, tzinfo=timezone.utc),
+        ),
+    )
+
+    archived = await service.archive_task(partner, created.task.id)
+
+    assert archived.task.status == "ARCHIVED"
+    assert archived.next_task is None
+    assert task_repository.next_id == 2
+    assert archived.notification_text == "Two остановил(а) повтор задачи «Полить цветы»."
+    assert task_repository.history[-1] == (created.task.id, "ARCHIVED", partner.id)
 
 
 def test_monthly_recurrence_clamps_deadline_to_last_day() -> None:

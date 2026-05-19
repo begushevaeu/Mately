@@ -293,6 +293,23 @@ class TaskService:
             next_task=next_task,
         )
 
+    async def archive_task(self, current_user: User, task_id: int) -> TaskMutationResult:
+        context = await self.get_context(current_user)
+        task = await self._get_scoped_task(context, task_id)
+        if task.status in {"COMPLETED", "ARCHIVED"}:
+            raise TaskServiceError("Task is already closed")
+
+        task = await self.tasks.archive(task)
+        await self.tasks.add_history(task_id=task.id, event_type="ARCHIVED", actor_id=current_user.id)
+        partner = context.partner
+        actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
+        action_text = "остановил(а) повтор задачи" if task.is_recurring else "удалил(а) задачу"
+        return TaskMutationResult(
+            task=task,
+            notification_user=partner,
+            notification_text=f"{actor_label.nominative_with_emoji} {action_text} «{task.title}».",
+        )
+
     async def build_task_card(self, context: CoupleTaskContext, task: Task, *, show_ownership: bool = False) -> str:
         card = build_task_summary(task, context.couple.timezone)
         if not show_ownership:

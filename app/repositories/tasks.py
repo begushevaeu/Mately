@@ -101,3 +101,8 @@ class TaskRepository:
         task.completed_at = datetime.now(timezone.utc)
         await self.session.flush()
         return task
+
+    async def archive(self, task: Task) -> Task:
+        task.status = "ARCHIVED"
+        await self.session.flush()
+        return task
