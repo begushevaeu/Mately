@@ -35,6 +35,9 @@ class FakeChatBlockService:
     async def reset_block(self, **_kwargs) -> None:
         return None
 
+    async def reset_other_blocks(self, **_kwargs) -> None:
+        return None
+
     async def remember_messages(self, *, messages, **_kwargs) -> None:
         self.__class__.remembered_message_ids = [message.message_id for message in messages]
 

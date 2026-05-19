@@ -1,4 +1,4 @@
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -132,7 +132,7 @@ async def handle_refresh_status(message: Message, session: AsyncSession) -> None
 
 
 @router.message(JoinCoupleStates.waiting_for_invite_code)
-async def handle_invite_code(message: Message, state: FSMContext, session: AsyncSession) -> None:
+async def handle_invite_code(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     result = await get_current_onboarding_result(message, session)
     if result is None:
         return
@@ -141,4 +141,4 @@ async def handle_invite_code(message: Message, state: FSMContext, session: Async
     joined_result = await CoupleService(session).join_couple(result.user, invite_code)
     await state.clear()
     await answer_for_onboarding_state(message, joined_result)
-    await maybe_prompt_partner_alias(message, joined_result, session, state)
+    await maybe_prompt_partner_alias(message, joined_result, session, state, bot)

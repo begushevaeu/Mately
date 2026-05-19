@@ -1,4 +1,4 @@
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,13 @@ from app.bot.keyboards.main_menu import (
     build_main_menu,
 )
 from app.bot.keyboards.settings import build_settings_keyboard
+from app.services.chat_blocks import (
+    CONTENT_BLOCK_KEY,
+    SETTINGS_BLOCK_KEY,
+    SHOPPING_BLOCK_KEY,
+    STATISTICS_BLOCK_KEY,
+    ChatBlockService,
+)
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 router = Router()
@@ -28,50 +35,102 @@ async def ensure_main_menu_access(message: Message, session: AsyncSession) -> On
     return result
 
 
+async def show_main_menu_block(
+    *,
+    message: Message,
+    session: AsyncSession,
+    bot: Bot,
+    result: OnboardingResult,
+    block_key: str,
+    text: str,
+    reply_markup,
+) -> None:
+    blocks = ChatBlockService(session)
+    await blocks.reset_other_blocks(
+        bot=bot,
+        user=result.user,
+        chat_id=message.chat.id,
+        current_block_key=block_key,
+    )
+    await blocks.reset_block(bot=bot, user=result.user, chat_id=message.chat.id, block_key=block_key)
+    sent_message = await message.answer(text, reply_markup=reply_markup)
+    await blocks.remember_messages(
+        user=result.user,
+        chat_id=message.chat.id,
+        block_key=block_key,
+        messages=[message, sent_message],
+    )
+
+
 @router.message(F.text == CONTENT_BUTTON)
-async def handle_content_menu(message: Message, session: AsyncSession) -> None:
-    if await ensure_main_menu_access(message, session) is None:
+async def handle_content_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_main_menu_access(message, session)
+    if result is None:
         return
 
-    await message.answer(
-        "Контент будет жить здесь: фильмы, книги, сериалы и оценки. Раздел подключим после задач и покупок.",
+    await show_main_menu_block(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
+        block_key=CONTENT_BLOCK_KEY,
+        text="Контент будет жить здесь: фильмы, книги, сериалы и оценки. Раздел подключим после задач и покупок.",
         reply_markup=build_main_menu(),
     )
 
 
 @router.message(F.text == SHOPPING_BUTTON)
-async def handle_shopping_menu(message: Message, session: AsyncSession) -> None:
-    if await ensure_main_menu_access(message, session) is None:
+async def handle_shopping_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_main_menu_access(message, session)
+    if result is None:
         return
 
-    await message.answer(
-        "Список покупок будет здесь. В ближайшем шаге добавлю добавление пунктов и отметку «куплено».",
+    await show_main_menu_block(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
+        block_key=SHOPPING_BLOCK_KEY,
+        text="Список покупок будет здесь. В ближайшем шаге добавлю добавление пунктов и отметку «куплено».",
         reply_markup=build_main_menu(),
     )
 
 
 @router.message(F.text == STATISTICS_BUTTON)
-async def handle_statistics_menu(message: Message, session: AsyncSession) -> None:
-    if await ensure_main_menu_access(message, session) is None:
+async def handle_statistics_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_main_menu_access(message, session)
+    if result is None:
         return
 
-    await message.answer(
-        "Статистика появится после первых задач и отметок контента. Пока тут будет тихий уголок ожидания.",
+    await show_main_menu_block(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
+        block_key=STATISTICS_BLOCK_KEY,
+        text="Статистика появится после первых задач и отметок контента. Пока тут будет тихий уголок ожидания.",
         reply_markup=build_main_menu(),
     )
 
 
 @router.message(F.text == SETTINGS_BUTTON)
-async def handle_settings_menu(message: Message, session: AsyncSession) -> None:
+async def handle_settings_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
     result = await ensure_main_menu_access(message, session)
     if result is None:
         return
 
     timezone = result.couple.timezone if result.couple is not None else "Europe/Moscow"
-    await message.answer(
-        "Настройки Mately\n\n"
-        f"Часовой пояс пары: {timezone}\n"
-        "Доступные команды: /menu, /cancel, /help",
+    await show_main_menu_block(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
+        block_key=SETTINGS_BLOCK_KEY,
+        text=(
+            "Настройки Mately\n\n"
+            f"Часовой пояс пары: {timezone}\n"
+            "Доступные команды: /menu, /cancel, /help"
+        ),
         reply_markup=build_settings_keyboard(),
     )
 

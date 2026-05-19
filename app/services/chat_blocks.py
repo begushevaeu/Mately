@@ -11,6 +11,18 @@ from app.repositories.chat_blocks import ChatBlockRepository
 logger = logging.getLogger(__name__)
 
 TASKS_BLOCK_KEY = "tasks"
+CONTENT_BLOCK_KEY = "content"
+SHOPPING_BLOCK_KEY = "shopping"
+STATISTICS_BLOCK_KEY = "statistics"
+SETTINGS_BLOCK_KEY = "settings"
+PARTNER_ALIAS_BLOCK_KEY = "partner_alias"
+MAIN_MENU_BLOCK_KEYS = (
+    TASKS_BLOCK_KEY,
+    CONTENT_BLOCK_KEY,
+    SHOPPING_BLOCK_KEY,
+    STATISTICS_BLOCK_KEY,
+    SETTINGS_BLOCK_KEY,
+)
 
 
 class ChatBlockService:
@@ -35,6 +47,18 @@ class ChatBlockService:
                 logger.debug("Failed to delete stale block message", exc_info=True)
 
         await self.blocks.clear(user_id=user.id, chat_id=chat_id, block_key=block_key)
+
+    async def reset_blocks(self, *, bot: Bot, user: User, chat_id: int, block_keys: tuple[str, ...]) -> None:
+        for block_key in block_keys:
+            await self.reset_block(bot=bot, user=user, chat_id=chat_id, block_key=block_key)
+
+    async def reset_other_blocks(self, *, bot: Bot, user: User, chat_id: int, current_block_key: str) -> None:
+        await self.reset_blocks(
+            bot=bot,
+            user=user,
+            chat_id=chat_id,
+            block_keys=tuple(block_key for block_key in MAIN_MENU_BLOCK_KEYS if block_key != current_block_key),
+        )
 
     async def remember_messages(self, *, user: User, chat_id: int, block_key: str, messages: list[Message]) -> None:
         message_ids = [message.message_id for message in messages]

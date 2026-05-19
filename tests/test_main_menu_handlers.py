@@ -4,15 +4,44 @@ import pytest
 
 from app.bot.handlers import main_menu
 from app.models import Couple, User
+from app.services.chat_blocks import CONTENT_BLOCK_KEY
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 
-class FakeMessage:
-    def __init__(self) -> None:
-        self.answers: list[str] = []
+class FakeChat:
+    id = 100
 
-    async def answer(self, text: str, **_) -> None:
+
+class FakeMessage:
+    def __init__(self, message_id: int = 1) -> None:
+        self.message_id = message_id
+        self.chat = FakeChat()
+        self.answers: list[str] = []
+        self.sent_messages: list[FakeMessage] = []
+
+    async def answer(self, text: str, **_) -> "FakeMessage":
         self.answers.append(text)
+        sent_message = FakeMessage(message_id=1000 + len(self.sent_messages))
+        self.sent_messages.append(sent_message)
+        return sent_message
+
+
+class FakeChatBlockService:
+    reset_other_block_key: str | None = None
+    reset_block_key: str | None = None
+    remembered_message_ids: list[int] = []
+
+    def __init__(self, _session) -> None:
+        pass
+
+    async def reset_other_blocks(self, *, current_block_key: str, **_) -> None:
+        self.__class__.reset_other_block_key = current_block_key
+
+    async def reset_block(self, *, block_key: str, **_) -> None:
+        self.__class__.reset_block_key = block_key
+
+    async def remember_messages(self, *, messages, **_) -> None:
+        self.__class__.remembered_message_ids = [message.message_id for message in messages]
 
 
 @pytest.mark.asyncio
@@ -58,3 +87,26 @@ async def test_main_menu_guard_allows_users_in_couple(monkeypatch: pytest.Monkey
 
     assert access_result is result
     assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_main_menu_block_resets_previous_blocks_and_remembers_current(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user)
+    message = FakeMessage(message_id=42)
+
+    monkeypatch.setattr(main_menu, "ChatBlockService", FakeChatBlockService)
+
+    await main_menu.show_main_menu_block(
+        message=message,
+        session=None,
+        bot=object(),
+        result=result,
+        block_key=CONTENT_BLOCK_KEY,
+        text="Контент",
+        reply_markup=None,
+    )
+
+    assert FakeChatBlockService.reset_other_block_key == CONTENT_BLOCK_KEY
+    assert FakeChatBlockService.reset_block_key == CONTENT_BLOCK_KEY
+    assert FakeChatBlockService.remembered_message_ids == [42, 1000]

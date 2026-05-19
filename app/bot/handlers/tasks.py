@@ -181,7 +181,14 @@ async def reset_and_show_tasks_menu(
     *,
     trigger_message: Message | None = None,
 ) -> None:
-    await ChatBlockService(session).reset_block(
+    blocks = ChatBlockService(session)
+    await blocks.reset_other_blocks(
+        bot=bot,
+        user=result.user,
+        chat_id=message.chat.id,
+        current_block_key=TASKS_BLOCK_KEY,
+    )
+    await blocks.reset_block(
         bot=bot,
         user=result.user,
         chat_id=message.chat.id,
@@ -197,7 +204,7 @@ async def reset_and_show_tasks_menu(
     if trigger_message is not None:
         messages_to_remember.insert(0, trigger_message)
 
-    await ChatBlockService(session).remember_messages(
+    await blocks.remember_messages(
         user=result.user,
         chat_id=message.chat.id,
         block_key=TASKS_BLOCK_KEY,
