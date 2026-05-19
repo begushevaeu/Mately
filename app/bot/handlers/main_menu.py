@@ -4,14 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.main_menu import (
-    CONTENT_BUTTON,
     SETTINGS_BUTTON,
     STATISTICS_BUTTON,
     build_main_menu,
 )
 from app.bot.keyboards.settings import build_settings_keyboard
 from app.services.chat_blocks import (
-    CONTENT_BLOCK_KEY,
     SETTINGS_BLOCK_KEY,
     STATISTICS_BLOCK_KEY,
     ChatBlockService,
@@ -57,23 +55,6 @@ async def show_main_menu_block(
         chat_id=message.chat.id,
         block_key=block_key,
         messages=[message, sent_message],
-    )
-
-
-@router.message(F.text == CONTENT_BUTTON)
-async def handle_content_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
-    result = await ensure_main_menu_access(message, session)
-    if result is None:
-        return
-
-    await show_main_menu_block(
-        message=message,
-        session=session,
-        bot=bot,
-        result=result,
-        block_key=CONTENT_BLOCK_KEY,
-        text="Контент будет жить здесь: фильмы, книги, сериалы и оценки. Раздел подключим после задач и покупок.",
-        reply_markup=build_main_menu(),
     )
 
 
