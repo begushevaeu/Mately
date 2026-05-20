@@ -1,9 +1,11 @@
 from app.bot.keyboards.content import (
     ADD_CONTENT_CALLBACK,
     CONTENT_COMPLETED_CALLBACK,
+    CONTENT_EMOJI_SKIP_CALLBACK,
     CONTENT_PLANNED_CALLBACK,
     build_content_list_keyboard,
     build_content_menu,
+    build_content_reaction_keyboard,
 )
 from app.models import ContentItem
 
@@ -40,3 +42,13 @@ def test_content_list_keyboard_switches_action_by_status() -> None:
     assert buttons[1].callback_data == "content:comment:1"
     assert buttons[2].callback_data == "content:rate:2"
     assert buttons[3].callback_data == "content:comment:2"
+
+
+def test_content_reaction_keyboard_uses_updated_reaction_set() -> None:
+    markup = build_content_reaction_keyboard()
+    reaction_rows = markup.inline_keyboard[:-1]
+    buttons = extract_buttons(markup)
+
+    assert [button.text for button in buttons[:-1]] == ["❤️", "🤩", "🤡", "💩", "🔥", "😭", "🥴", "👍🏻", "👎🏻"]
+    assert [len(row) for row in reaction_rows] == [3, 3, 3]
+    assert buttons[-1].callback_data == CONTENT_EMOJI_SKIP_CALLBACK

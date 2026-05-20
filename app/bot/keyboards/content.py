@@ -120,18 +120,18 @@ def build_content_rating_keyboard(content_id: int | None = None) -> InlineKeyboa
 
 def build_content_reaction_keyboard() -> InlineKeyboardMarkup:
     reactions = list(CONTENT_REACTIONS.items())
+    rows = []
+    for index in range(0, len(reactions), 3):
+        rows.append(
+            [
+                InlineKeyboardButton(text=emoji, callback_data=f"content:emoji:{key}")
+                for key, emoji in reactions[index : index + 3]
+            ]
+        )
+
+    rows.append([InlineKeyboardButton(text="Без реакции", callback_data=CONTENT_EMOJI_SKIP_CALLBACK)])
     return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=emoji, callback_data=f"content:emoji:{key}")
-                for key, emoji in reactions[:3]
-            ],
-            [
-                InlineKeyboardButton(text=emoji, callback_data=f"content:emoji:{key}")
-                for key, emoji in reactions[3:]
-            ],
-            [InlineKeyboardButton(text="Без реакции", callback_data=CONTENT_EMOJI_SKIP_CALLBACK)],
-        ]
+        inline_keyboard=rows
     )
 
 

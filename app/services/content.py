@@ -44,12 +44,15 @@ CATEGORY_LABELS = {
 }
 
 CONTENT_REACTIONS = {
-    "love": "😍",
+    "heart": "❤️",
+    "starstruck": "🤩",
+    "clown": "🤡",
+    "poop": "💩",
     "fire": "🔥",
-    "fun": "😂",
     "cry": "😭",
-    "think": "🤔",
-    "sleep": "😴",
+    "woozy": "🥴",
+    "thumbs_up": "👍🏻",
+    "thumbs_down": "👎🏻",
 }
 
 
