@@ -268,6 +268,37 @@ class TaskService:
         context = await self.get_context(current_user)
         return context, await self.tasks.list_pool_for_users(context.member_ids)
 
+    async def regenerate_due_recurring_tasks(
+        self,
+        context: CoupleTaskContext,
+        *,
+        now: datetime | None = None,
+    ) -> list[TaskMutationResult]:
+        now = now or datetime.now(timezone.utc)
+        active_tasks = await self.tasks.list_active_for_users(context.member_ids)
+        results = []
+        for task in active_tasks:
+            if not task.is_recurring or task.recurrence_type is None or task.deadline is None:
+                continue
+            if task.deadline > now:
+                continue
+            if await self.tasks.has_generated_recurrence(task.id):
+                continue
+
+            if task.status != "OVERDUE":
+                task = await self.tasks.mark_overdue(task)
+                await self.tasks.add_history(task_id=task.id, event_type="OVERDUE", actor_id=task.created_by)
+
+            next_task = await self._create_next_recurring_task(
+                context=context,
+                task=task,
+                actor_id=task.created_by,
+                now=now,
+            )
+            results.append(TaskMutationResult(task=task, next_task=next_task))
+
+        return results
+
     async def claim_task(self, current_user: User, task_id: int) -> TaskMutationResult:
         context = await self.get_context(current_user)
         task = await self._get_scoped_task(context, task_id)
@@ -368,8 +399,11 @@ class TaskService:
         context: CoupleTaskContext,
         task: Task,
         actor_id: int,
+        now: datetime | None = None,
     ) -> Task | None:
         if not task.is_recurring or task.recurrence_type is None:
+            return None
+        if await self.tasks.has_generated_recurrence(task.id):
             return None
 
         assigned_at = datetime.now(timezone.utc) if task.assigned_to is not None else None
@@ -380,7 +414,7 @@ class TaskService:
             is_recurring=True,
             recurrence_type=task.recurrence_type,
             recurrence_interval_days=task.recurrence_interval_days,
-            deadline=calculate_next_recurrence_deadline(task, context.couple.timezone, completed_at=task.completed_at),
+            deadline=calculate_next_recurrence_deadline(task, context.couple.timezone, completed_at=task.completed_at or now),
             status="ASSIGNED" if task.assigned_to is not None else "OPEN",
             assigned_at=assigned_at,
         )

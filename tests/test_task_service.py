@@ -62,6 +62,13 @@ class FakeTaskRepository:
             and (task.created_by in user_ids or task.assigned_to in user_ids)
         ]
 
+    async def list_for_users(self, user_ids: list[int]) -> list[Task]:
+        return [
+            task
+            for task in self.tasks.values()
+            if task.created_by in user_ids or task.assigned_to in user_ids
+        ]
+
     async def list_assigned_to_user(self, user_id: int) -> list[Task]:
         return [
             task
@@ -79,6 +86,12 @@ class FakeTaskRepository:
     async def add_history(self, *, task_id: int, event_type: str, actor_id: int, details: str | None = None) -> None:
         self.history.append((task_id, event_type, actor_id))
 
+    async def has_generated_recurrence(self, task_id: int) -> bool:
+        return any(
+            history_task_id == task_id and event_type == "RECURRENCE_CREATED"
+            for history_task_id, event_type, _actor_id in self.history
+        )
+
     async def assign(self, task: Task, user_id: int) -> Task:
         task.assigned_to = user_id
         task.status = "ASSIGNED"
@@ -91,6 +104,10 @@ class FakeTaskRepository:
 
     async def archive(self, task: Task) -> Task:
         task.status = "ARCHIVED"
+        return task
+
+    async def mark_overdue(self, task: Task) -> Task:
+        task.status = "OVERDUE"
         return task
 
 
@@ -199,6 +216,37 @@ async def test_completing_recurring_task_creates_next_occurrence() -> None:
         (next_task.id, "RECURRENCE_CREATED", partner.id),
         (created.task.id, "RECURRENCE_CREATED", partner.id),
     ]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_regenerates_overdue_recurring_task_once() -> None:
+    service, creator, partner, task_repository = build_service()
+    created = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="РџРѕР»РёС‚СЊ С†РІРµС‚С‹",
+            is_recurring=True,
+            recurrence_type=RecurrenceType.DAILY,
+            assignment_type=AssignmentType.PARTNER,
+            deadline=datetime(2026, 5, 18, 20, 59, tzinfo=timezone.utc),
+        ),
+    )
+    context = await service.get_context(creator)
+
+    regenerated = await service.regenerate_due_recurring_tasks(
+        context,
+        now=datetime(2026, 5, 20, 10, 0, tzinfo=timezone.utc),
+    )
+
+    assert len(regenerated) == 1
+    assert regenerated[0].task.status == "OVERDUE"
+    assert regenerated[0].next_task is not None
+    assert regenerated[0].next_task.id == 2
+    assert regenerated[0].next_task.deadline == datetime(2026, 5, 20, 20, 59, tzinfo=timezone.utc)
+    completed = await service.complete_task(partner, created.task.id)
+
+    assert completed.next_task is None
+    assert task_repository.next_id == 3
 
 
 @pytest.mark.asyncio

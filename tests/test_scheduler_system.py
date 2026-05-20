@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from datetime import datetime, time, timezone
+
+from app.models import Couple, Task, User
+from app.schedulers.system import (
+    EVENING_REMINDER_TIME,
+    MORNING_REMINDER_TIME,
+    build_dedupe_key,
+    is_same_local_minute,
+    local_schedule_datetime,
+    overdue_tasks,
+    schedule_time_for_type,
+    tasks_due_on_local_date,
+)
+
+
+def test_scheduler_matches_couple_local_minute() -> None:
+    local_now = datetime(2026, 5, 20, 9, 0, 30, tzinfo=timezone.utc)
+
+    assert is_same_local_minute(local_now, MORNING_REMINDER_TIME) is True
+    assert is_same_local_minute(local_now, EVENING_REMINDER_TIME) is False
+
+
+def test_scheduler_dedupe_keys_use_local_periods() -> None:
+    couple = Couple(id=10, invite_code="ABC12345", timezone="Europe/Moscow")
+    user = User(id=20, telegram_id=200, username=None, first_name=None)
+    monday = datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+
+    assert build_dedupe_key(couple, user, "morning_reminder", monday) == "morning_reminder:couple:10:user:20:2026-05-18"
+    assert build_dedupe_key(couple, user, "weekly_recap", monday) == "weekly_recap:couple:10:user:20:2026-W21"
+    assert build_dedupe_key(couple, user, "monthly_recap", monday) == "monthly_recap:couple:10:user:20:2026-05"
+
+
+def test_scheduler_records_local_scheduled_time_in_utc() -> None:
+    local_now = datetime(2026, 5, 20, 9, 15, tzinfo=timezone.utc)
+
+    assert local_schedule_datetime(local_now, time(hour=9, minute=0)) == datetime(
+        2026,
+        5,
+        20,
+        9,
+        0,
+        tzinfo=timezone.utc,
+    )
+    assert schedule_time_for_type("evening_reminder") is EVENING_REMINDER_TIME
+
+
+def test_scheduler_task_filters_use_deadlines() -> None:
+    now = datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc)
+    due_today = Task(id=1, title="A", created_by=1, assigned_to=2, status="ASSIGNED", deadline=now)
+    overdue = Task(
+        id=2,
+        title="B",
+        created_by=1,
+        assigned_to=2,
+        status="ASSIGNED",
+        deadline=datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc),
+    )
+    later = Task(
+        id=3,
+        title="C",
+        created_by=1,
+        assigned_to=2,
+        status="ASSIGNED",
+        deadline=datetime(2026, 5, 21, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert tasks_due_on_local_date([due_today, overdue, later], now) == [due_today]
+    assert overdue_tasks([due_today, overdue, later], now) == [due_today, overdue]

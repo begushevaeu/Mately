@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import or_, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Task, TaskHistory
@@ -57,6 +57,14 @@ class TaskRepository:
         )
         return list(result.scalars().all())
 
+    async def list_for_users(self, user_ids: list[int]) -> list[Task]:
+        result = await self.session.execute(
+            select(Task)
+            .where(or_(Task.created_by.in_(user_ids), Task.assigned_to.in_(user_ids)))
+            .order_by(Task.deadline.is_(None), Task.deadline, Task.id)
+        )
+        return list(result.scalars().all())
+
     async def list_assigned_to_user(self, user_id: int) -> list[Task]:
         result = await self.session.execute(
             select(Task)
@@ -89,6 +97,18 @@ class TaskRepository:
         )
         await self.session.flush()
 
+    async def has_generated_recurrence(self, task_id: int) -> bool:
+        result = await self.session.execute(
+            select(
+                exists().where(
+                    TaskHistory.task_id == task_id,
+                    TaskHistory.event_type == "RECURRENCE_CREATED",
+                    TaskHistory.details.like("next_task_id=%"),
+                )
+            )
+        )
+        return result.scalar()
+
     async def assign(self, task: Task, user_id: int) -> Task:
         task.assigned_to = user_id
         task.assigned_at = datetime.now(timezone.utc)
@@ -104,5 +124,10 @@ class TaskRepository:
 
     async def archive(self, task: Task) -> Task:
         task.status = "ARCHIVED"
+        await self.session.flush()
+        return task
+
+    async def mark_overdue(self, task: Task) -> Task:
+        task.status = "OVERDUE"
         await self.session.flush()
         return task
