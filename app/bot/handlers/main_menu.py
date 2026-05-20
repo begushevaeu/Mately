@@ -8,15 +8,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics import AnalyticsService
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
+from app.bot.keyboards.additional import (
+    ADDITIONAL_MENU_CALLBACK,
+    ADDITIONAL_SETTINGS_CALLBACK,
+    ADDITIONAL_STATISTICS_CALLBACK,
+    build_additional_keyboard,
+)
 from app.bot.keyboards.blocks import (
     CLOSE_BLOCK_CALLBACK_PREFIX,
     parse_close_block_callback,
 )
 from app.bot.keyboards.main_menu import (
-    SETTINGS_BUTTON,
-    STATISTICS_BUTTON,
+    ADDITIONAL_BUTTON,
+    PLACES_BUTTON,
     build_main_menu,
 )
+from app.bot.keyboards.places import build_places_keyboard
 from app.bot.keyboards.settings import build_settings_keyboard
 from app.bot.keyboards.statistics import (
     STATISTICS_MONTH_CALLBACK,
@@ -24,9 +31,9 @@ from app.bot.keyboards.statistics import (
     build_statistics_keyboard,
 )
 from app.services.chat_blocks import (
+    ADDITIONAL_BLOCK_KEY,
     MAIN_MENU_BLOCK_KEYS,
-    SETTINGS_BLOCK_KEY,
-    STATISTICS_BLOCK_KEY,
+    PLACES_BLOCK_KEY,
     ChatBlockService,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
@@ -101,6 +108,27 @@ async def build_statistics_panel_text(
     )
 
 
+def build_additional_panel_text() -> str:
+    return "✨ <b>Дополнительно</b>\n\nЗдесь живут настройки и статистика."
+
+
+def build_places_placeholder_text() -> str:
+    return (
+        "📍 <b>Места</b>\n\n"
+        "Скоро здесь можно будет сохранять места, куда хочется сходить, "
+        "а после посещения оставлять реакцию, оценку и комментарий."
+    )
+
+
+def build_settings_panel_text(result: OnboardingResult) -> str:
+    timezone_name = result.couple.timezone if result.couple is not None else "Europe/Moscow"
+    return (
+        "⚙️ <b>Настройки</b>\n\n"
+        f"Часовой пояс пары: {timezone_name}\n"
+        "Доступные команды: /menu, /cancel, /help"
+    )
+
+
 @router.callback_query(F.data.startswith(CLOSE_BLOCK_CALLBACK_PREFIX))
 async def handle_close_block(callback: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     await callback.answer()
@@ -128,23 +156,75 @@ async def handle_close_block(callback: CallbackQuery, state: FSMContext, session
         pass
 
 
-@router.message(F.text == STATISTICS_BUTTON)
-async def handle_statistics_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
+@router.message(F.text == PLACES_BUTTON)
+async def handle_places_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
     result = await ensure_main_menu_access(message, session)
     if result is None:
         return
 
-    text = await build_statistics_panel_text(session, result, period="week")
     await show_main_menu_block(
         message=message,
         session=session,
         bot=bot,
         result=result,
-        block_key=STATISTICS_BLOCK_KEY,
-        text=text,
-        reply_markup=build_statistics_keyboard(),
+        block_key=PLACES_BLOCK_KEY,
+        text=build_places_placeholder_text(),
+        reply_markup=build_places_keyboard(),
         parse_mode="HTML",
     )
+
+
+@router.message(F.text == ADDITIONAL_BUTTON)
+async def handle_additional_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_main_menu_access(message, session)
+    if result is None:
+        return
+
+    await show_main_menu_block(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
+        block_key=ADDITIONAL_BLOCK_KEY,
+        text=build_additional_panel_text(),
+        reply_markup=build_additional_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == ADDITIONAL_MENU_CALLBACK)
+async def handle_additional_menu_callback(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer()
+        return
+
+    result = await get_current_result_for_callback(callback, session)
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        build_additional_panel_text(),
+        reply_markup=build_additional_keyboard(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == ADDITIONAL_STATISTICS_CALLBACK)
+async def handle_additional_statistics(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer()
+        return
+
+    result = await get_current_result_for_callback(callback, session)
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        await callback.answer()
+        return
+
+    text = await build_statistics_panel_text(session, result, period="week")
+    await callback.message.edit_text(text, reply_markup=build_statistics_keyboard(), parse_mode="HTML")
+    await callback.answer()
 
 
 @router.callback_query(F.data.in_({STATISTICS_WEEK_CALLBACK, STATISTICS_MONTH_CALLBACK}))
@@ -164,26 +244,23 @@ async def handle_statistics_period(callback: CallbackQuery, session: AsyncSessio
     await callback.answer()
 
 
-@router.message(F.text == SETTINGS_BUTTON)
-async def handle_settings_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
-    result = await ensure_main_menu_access(message, session)
-    if result is None:
+@router.callback_query(F.data == ADDITIONAL_SETTINGS_CALLBACK)
+async def handle_additional_settings(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.message is None:
+        await callback.answer()
         return
 
-    timezone = result.couple.timezone if result.couple is not None else "Europe/Moscow"
-    await show_main_menu_block(
-        message=message,
-        session=session,
-        bot=bot,
-        result=result,
-        block_key=SETTINGS_BLOCK_KEY,
-        text=(
-            "Настройки Mately\n\n"
-            f"Часовой пояс пары: {timezone}\n"
-            "Доступные команды: /menu, /cancel, /help"
-        ),
+    result = await get_current_result_for_callback(callback, session)
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        build_settings_panel_text(result),
         reply_markup=build_settings_keyboard(),
+        parse_mode="HTML",
     )
+    await callback.answer()
 
 
 @router.message(F.text)

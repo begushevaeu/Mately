@@ -10,7 +10,7 @@ from app.bot.keyboards.main_menu import build_main_menu
 from app.bot.keyboards.onboarding import build_cancel_menu
 from app.bot.keyboards.settings import SETUP_PARTNER_ALIAS_CALLBACK
 from app.bot.states.partner_alias import PartnerAliasStates
-from app.services.chat_blocks import PARTNER_ALIAS_BLOCK_KEY, ChatBlockService
+from app.services.chat_blocks import ADDITIONAL_BLOCK_KEY, PARTNER_ALIAS_BLOCK_KEY, ChatBlockService
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 from app.services.partner_aliases import PartnerAliasInput, PartnerAliasService, normalize_alias_value
 from app.services.tasks import TaskService, TaskServiceError
@@ -75,6 +75,15 @@ async def reset_alias_block(bot: Bot, session: AsyncSession, result: OnboardingR
         user=result.user,
         chat_id=chat_id,
         block_key=PARTNER_ALIAS_BLOCK_KEY,
+    )
+
+
+async def reset_additional_block(bot: Bot, session: AsyncSession, result: OnboardingResult, chat_id: int) -> None:
+    await ChatBlockService(session).reset_block(
+        bot=bot,
+        user=result.user,
+        chat_id=chat_id,
+        block_key=ADDITIONAL_BLOCK_KEY,
     )
 
 
@@ -146,6 +155,7 @@ async def handle_setup_partner_alias(callback: CallbackQuery, state: FSMContext,
     await state.set_state(PartnerAliasStates.waiting_for_emoji)
     await state.update_data(partner_user_id=partner.id)
     await reset_alias_block(bot, session, result, callback.message.chat.id)
+    await reset_additional_block(bot, session, result, callback.message.chat.id)
     await send_alias_prompt(callback.message, session, result, "Отправь эмодзи для партнера. Например: 🥒")
     await callback.answer()
 

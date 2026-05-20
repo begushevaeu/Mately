@@ -15,5 +15,7 @@ def test_main_menu_contains_core_sections() -> None:
     assert "📋 Задачи" in button_texts
     assert "🎬 Контент" in button_texts
     assert "🛒 Покупки" in button_texts
-    assert "📊 Статистика" in button_texts
-    assert "⚙️ Настройки" in button_texts
+    assert "📍 Места" in button_texts
+    assert "✨ Дополнительно" in button_texts
+    assert "📊 Статистика" not in button_texts
+    assert "⚙️ Настройки" not in button_texts

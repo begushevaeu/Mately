@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 TASKS_BLOCK_KEY = "tasks"
 CONTENT_BLOCK_KEY = "content"
 SHOPPING_BLOCK_KEY = "shopping"
+PLACES_BLOCK_KEY = "places"
+ADDITIONAL_BLOCK_KEY = "additional"
 STATISTICS_BLOCK_KEY = "statistics"
 SETTINGS_BLOCK_KEY = "settings"
 PARTNER_ALIAS_BLOCK_KEY = "partner_alias"
@@ -21,6 +23,8 @@ MAIN_MENU_BLOCK_KEYS = (
     TASKS_BLOCK_KEY,
     CONTENT_BLOCK_KEY,
     SHOPPING_BLOCK_KEY,
+    PLACES_BLOCK_KEY,
+    ADDITIONAL_BLOCK_KEY,
     STATISTICS_BLOCK_KEY,
     SETTINGS_BLOCK_KEY,
 )
