@@ -102,12 +102,23 @@ async def add_content_block_messages(session: AsyncSession, user, chat_id: int, 
 
 
 async def remember_content_panel_in_state(state: FSMContext, message: Message) -> None:
-    await state.update_data(content_panel_chat_id=message.chat.id, content_panel_message_id=message.message_id)
+    await state.update_data(
+        content_panel_chat_id=message.chat.id,
+        content_panel_message_id=message.message_id,
+        content_panel_is_media=is_media_panel_message(message),
+    )
+
+
+def is_media_panel_message(message: Message) -> bool:
+    return bool(getattr(message, "photo", None))
 
 
 async def edit_content_panel(message: Message, text: str, reply_markup=None) -> None:
     try:
-        await message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
+        if is_media_panel_message(message):
+            await message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
     except TelegramAPIError:
         logger.exception("Failed to edit content panel")
 
@@ -116,17 +127,27 @@ async def edit_content_panel_from_state(bot: Bot, state: FSMContext, text: str, 
     data = await state.get_data()
     chat_id = data.get("content_panel_chat_id")
     message_id = data.get("content_panel_message_id")
+    is_media_panel = data.get("content_panel_is_media", False)
     if chat_id is None or message_id is None:
         return
 
     try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode="HTML",
-        )
+        if is_media_panel:
+            await bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=message_id,
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
     except TelegramAPIError:
         logger.exception("Failed to edit content panel from state")
 
