@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models import Comment, ContentItem, Couple, CoupleMember, PartnerAlias, Rating, User
+from app.notifications.cats import CatNotificationType
 from app.services.content import (
     ContentCategory,
     ContentListFilter,
@@ -137,6 +138,7 @@ async def test_content_can_be_added_completed_and_rated() -> None:
     assert completed.item.status == "COMPLETED"
     assert completed.notification_user is creator
     assert completed.notification_text == "Two отметил(а) «Интерстеллар» как завершённое. Хочешь поставить оценку?"
+    assert completed.cat_notification_type is CatNotificationType.COMPLETED
     assert rating.score == 10
     assert rating.emoji == "🔥"
     assert items == [item]

@@ -5,7 +5,7 @@ from html import escape
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cozy import append_cozy_suffix
@@ -41,6 +41,7 @@ from app.bot.keyboards.tasks import (
 from app.bot.states.tasks import TaskCreationStates
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 from app.services.chat_blocks import TASKS_BLOCK_KEY, ChatBlockService
+from app.notifications.cats import select_cat_asset
 from app.services.partner_aliases import PartnerAliasService
 from app.services.tasks import (
     AssignmentType,
@@ -117,6 +118,18 @@ async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
         theme=result.cozy_theme,
         subject=result.cozy_subject,
     )
+    cat_asset = select_cat_asset(result.cat_notification_type)
+    try:
+        if cat_asset is not None:
+            await bot.send_photo(
+                result.notification_user.telegram_id,
+                FSInputFile(cat_asset),
+                caption=notification_text,
+            )
+            return
+    except TelegramAPIError:
+        logger.exception("Failed to send task notification photo")
+
     try:
         await bot.send_message(result.notification_user.telegram_id, notification_text)
     except TelegramAPIError:

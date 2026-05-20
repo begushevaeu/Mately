@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models import Couple, CoupleMember, PartnerAlias, Task, User
+from app.notifications.cats import CatNotificationType
 from app.services.tasks import (
     AssignmentType,
     RecurrenceType,
@@ -181,6 +182,7 @@ async def test_completing_recurring_task_creates_next_occurrence() -> None:
     next_task = completed.next_task
 
     assert completed.task.status == "COMPLETED"
+    assert completed.cat_notification_type is CatNotificationType.COMPLETED
     assert next_task is not None
     assert next_task.id == 2
     assert next_task.title == "Полить цветы"

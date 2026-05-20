@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cozy import CozyMessageTheme
 from app.models import Comment, ContentItem, Couple, Rating, User
+from app.notifications.cats import CatNotificationType
 from app.repositories.content import ContentRepository
 from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
@@ -88,6 +89,7 @@ class ContentMutationResult:
     notification_text: str | None = None
     cozy_theme: CozyMessageTheme | None = None
     cozy_subject: str | None = None
+    cat_notification_type: CatNotificationType | None = None
 
 
 class ContentService:
@@ -152,6 +154,7 @@ class ContentService:
             ),
             cozy_theme=CozyMessageTheme.CONTENT_COMPLETED,
             cozy_subject=item.title,
+            cat_notification_type=CatNotificationType.COMPLETED,
         )
 
     async def save_rating(

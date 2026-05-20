@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cozy import CozyMessageTheme
 from app.models import Couple, Task, User
+from app.notifications.cats import CatNotificationType
 from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
 from app.repositories.tasks import TaskRepository
@@ -53,6 +54,7 @@ class TaskMutationResult:
     notification_text: str | None = None
     cozy_theme: CozyMessageTheme | None = None
     cozy_subject: str | None = None
+    cat_notification_type: CatNotificationType | None = None
     next_task: Task | None = None
 
 
@@ -305,6 +307,7 @@ class TaskService:
             notification_text=notification_text,
             cozy_theme=CozyMessageTheme.TASK_COMPLETED,
             cozy_subject=task.title,
+            cat_notification_type=CatNotificationType.COMPLETED,
             next_task=next_task,
         )
 

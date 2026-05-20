@@ -4,7 +4,7 @@ from html import escape
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cozy import append_cozy_suffix
@@ -35,6 +35,7 @@ from app.bot.keyboards.content import (
 )
 from app.bot.keyboards.main_menu import CONTENT_BUTTON
 from app.bot.states.content import ContentStates
+from app.notifications.cats import select_cat_asset
 from app.services.chat_blocks import CONTENT_BLOCK_KEY, ChatBlockService
 from app.services.content import (
     CONTENT_REACTIONS,
@@ -139,11 +140,25 @@ async def send_content_notification(bot: Bot, result: ContentMutationResult) -> 
         theme=result.cozy_theme,
         subject=result.cozy_subject,
     )
+    cat_asset = select_cat_asset(result.cat_notification_type)
+    reply_markup = build_content_notification_keyboard(result.item.id)
+    try:
+        if cat_asset is not None:
+            await bot.send_photo(
+                result.notification_user.telegram_id,
+                FSInputFile(cat_asset),
+                caption=notification_text,
+                reply_markup=reply_markup,
+            )
+            return
+    except TelegramAPIError:
+        logger.exception("Failed to send content notification photo")
+
     try:
         await bot.send_message(
             result.notification_user.telegram_id,
             notification_text,
-            reply_markup=build_content_notification_keyboard(result.item.id),
+            reply_markup=reply_markup,
         )
     except TelegramAPIError:
         logger.exception("Failed to send content notification")
