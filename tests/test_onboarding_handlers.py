@@ -54,6 +54,9 @@ class FakeChatBlockService:
     async def reset_block(self, **_kwargs) -> None:
         self.__class__.events.append("reset_onboarding")
 
+    async def reset_blocks(self, *, block_keys, **_kwargs) -> None:
+        self.__class__.events.append(f"reset_blocks:{','.join(block_keys)}")
+
 
 @pytest.mark.asyncio
 async def test_successful_invite_code_cleans_onboarding_block_before_final_message(
@@ -88,3 +91,36 @@ async def test_successful_invite_code_cleans_onboarding_block_before_final_messa
     )
 
     assert events == ["remember:42", "clear_state", "reset_onboarding", "answer:IN_COUPLE", "alias_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_cancel_clears_state_resets_blocks_and_returns_to_safe_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name="One")
+    current_result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user)
+    message = FakeMessage(message_id=42, text="/cancel")
+    events: list[str] = []
+    FakeChatBlockService.events = events
+
+    async def fake_get_current_onboarding_result(*_args, **_kwargs) -> OnboardingResult:
+        return current_result
+
+    async def fake_answer_for_onboarding_state(_message, result: OnboardingResult) -> None:
+        events.append(f"answer:{result.status.value}")
+
+    monkeypatch.setattr(onboarding, "get_current_onboarding_result", fake_get_current_onboarding_result)
+    monkeypatch.setattr(onboarding, "ChatBlockService", FakeChatBlockService)
+    monkeypatch.setattr(onboarding, "answer_for_onboarding_state", fake_answer_for_onboarding_state)
+
+    await onboarding.handle_cancel(
+        message,
+        state=FakeState(events),
+        session=None,
+        bot=object(),
+    )
+
+    assert events == [
+        "clear_state",
+        "reset_blocks:tasks,content,shopping,statistics,settings,onboarding,partner_alias",
+        "answer:IN_COUPLE",
+    ]
+    assert len(message.sent_messages) == 1

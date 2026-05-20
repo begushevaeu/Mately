@@ -1,8 +1,9 @@
 from aiogram import Router
 
-from app.bot.handlers import content, main_menu, onboarding, partner_aliases, shopping, start, tasks
+from app.bot.handlers import content, errors, main_menu, onboarding, partner_aliases, shopping, start, tasks
 
 router = Router()
+router.include_router(errors.router)
 router.include_router(onboarding.router)
 router.include_router(partner_aliases.router)
 router.include_router(start.router)

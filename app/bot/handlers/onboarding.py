@@ -16,10 +16,16 @@ from app.bot.keyboards.onboarding import (
 )
 from app.bot.states.onboarding import JoinCoupleStates
 from app.bot.handlers.partner_aliases import maybe_prompt_partner_alias
-from app.services.chat_blocks import ONBOARDING_BLOCK_KEY, ChatBlockService
+from app.services.chat_blocks import (
+    MAIN_MENU_BLOCK_KEYS,
+    ONBOARDING_BLOCK_KEY,
+    PARTNER_ALIAS_BLOCK_KEY,
+    ChatBlockService,
+)
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 
 router = Router()
+RECOVERABLE_BLOCK_KEYS = MAIN_MENU_BLOCK_KEYS + (ONBOARDING_BLOCK_KEY, PARTNER_ALIAS_BLOCK_KEY)
 
 
 def profile_from_message(message: Message) -> TelegramUserProfile | None:
@@ -104,11 +110,21 @@ async def reset_onboarding_block(*, session: AsyncSession, bot: Bot, result: Onb
     )
 
 
+async def reset_recoverable_blocks(*, session: AsyncSession, bot: Bot, result: OnboardingResult, chat_id: int) -> None:
+    await ChatBlockService(session).reset_blocks(
+        bot=bot,
+        user=result.user,
+        chat_id=chat_id,
+        block_keys=RECOVERABLE_BLOCK_KEYS,
+    )
+
+
 @router.message(Command("menu"))
-async def handle_menu(message: Message, state: FSMContext, session: AsyncSession) -> None:
+async def handle_menu(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     await state.clear()
     result = await get_current_onboarding_result(message, session)
     if result is not None:
+        await reset_recoverable_blocks(session=session, bot=bot, result=result, chat_id=message.chat.id)
         await answer_for_onboarding_state(message, result)
 
 
@@ -125,10 +141,11 @@ async def handle_help(message: Message) -> None:
 
 @router.message(Command("cancel"))
 @router.message(F.text == CANCEL_BUTTON)
-async def handle_cancel(message: Message, state: FSMContext, session: AsyncSession) -> None:
+async def handle_cancel(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     await state.clear()
     result = await get_current_onboarding_result(message, session)
     if result is not None:
+        await reset_recoverable_blocks(session=session, bot=bot, result=result, chat_id=message.chat.id)
         await message.answer("Ок, остановились здесь.")
         await answer_for_onboarding_state(message, result)
 
