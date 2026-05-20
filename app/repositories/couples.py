@@ -36,6 +36,10 @@ class CoupleRepository:
         result = await self.session.execute(select(Couple).where(Couple.invite_code == invite_code))
         return result.scalar_one_or_none()
 
+    async def lock_by_id(self, couple_id: int) -> Couple | None:
+        result = await self.session.execute(select(Couple).where(Couple.id == couple_id).with_for_update())
+        return result.scalar_one_or_none()
+
     async def list_all(self) -> list[Couple]:
         result = await self.session.execute(select(Couple).order_by(Couple.id))
         return list(result.scalars().all())

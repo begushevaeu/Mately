@@ -7,8 +7,10 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://mately:mately@db:5432/mately
+      RUN_MIGRATIONS: "true"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
@@ -21,6 +23,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mately -d mately"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 volumes:

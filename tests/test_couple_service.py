@@ -9,9 +9,11 @@ from app.core.config import Settings
 from app.models import Couple, CoupleMember, User
 from app.services.couples import (
     CoupleService,
+    MAX_PROFILE_TEXT_LENGTH,
     OnboardingStatus,
     TelegramUserProfile,
     generate_invite_code,
+    is_valid_invite_code,
     normalize_invite_code,
 )
 
@@ -62,6 +64,9 @@ class FakeCoupleRepository:
     async def get_by_invite_code(self, invite_code: str) -> Couple | None:
         return next((couple for couple in self.couples.values() if couple.invite_code == invite_code), None)
 
+    async def lock_by_id(self, couple_id: int) -> Couple | None:
+        return self.couples.get(couple_id)
+
     async def create(self, invite_code: str, invite_expires_at, timezone: str) -> Couple:
         couple = Couple(
             id=self.next_id,
@@ -102,6 +107,8 @@ def test_invite_code_helpers_keep_codes_readable() -> None:
 
     assert len(code) == 8
     assert normalize_invite_code(" abcd-1234 ") == "ABCD1234"
+    assert is_valid_invite_code(code) is True
+    assert is_valid_invite_code("BAD!") is False
 
 
 @pytest.mark.asyncio
@@ -137,12 +144,46 @@ async def test_expired_invite_code_is_rejected() -> None:
 
 
 @pytest.mark.asyncio
+async def test_invalid_invite_code_shape_is_rejected_before_lookup() -> None:
+    service = build_service()
+    user = await service.get_or_register_user(TelegramUserProfile(telegram_id=1, username=None, first_name=None))
+
+    result = await service.join_couple(user, "not a valid invite code")
+
+    assert result.status is OnboardingStatus.INVALID_OR_EXPIRED_INVITE
+
+
+@pytest.mark.asyncio
+async def test_telegram_profile_is_validated_and_trimmed() -> None:
+    service = build_service()
+
+    user = await service.get_or_register_user(
+        TelegramUserProfile(
+            telegram_id=1,
+            username="  one   user  ",
+            first_name="x" * (MAX_PROFILE_TEXT_LENGTH + 10),
+        )
+    )
+
+    assert user.username == "one user"
+    assert user.first_name == "x" * MAX_PROFILE_TEXT_LENGTH
+
+
+@pytest.mark.asyncio
+async def test_invalid_telegram_id_is_rejected() -> None:
+    service = build_service()
+
+    with pytest.raises(ValueError, match="invalid Telegram user id"):
+        await service.get_or_register_user(TelegramUserProfile(telegram_id=0, username=None, first_name=None))
+
+
+@pytest.mark.asyncio
 async def test_full_couple_is_rejected() -> None:
     service = build_service()
     repositories = service.fake_repositories  # type: ignore[attr-defined]
     couple = Couple(
         id=1,
-        invite_code="FULL1234",
+        invite_code="FULL2234",
         invite_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         timezone="Europe/Moscow",
     )
@@ -151,6 +192,6 @@ async def test_full_couple_is_rejected() -> None:
     await repositories.couples.add_member(user_id=11, couple_id=couple.id)
     user = await service.get_or_register_user(TelegramUserProfile(telegram_id=3, username=None, first_name=None))
 
-    result = await service.join_couple(user, "FULL1234")
+    result = await service.join_couple(user, "FULL2234")
 
     assert result.status is OnboardingStatus.COUPLE_FULL

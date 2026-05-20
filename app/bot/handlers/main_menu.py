@@ -23,7 +23,6 @@ from app.bot.keyboards.statistics import (
     STATISTICS_WEEK_CALLBACK,
     build_statistics_keyboard,
 )
-from app.repositories.couples import CoupleRepository
 from app.services.chat_blocks import (
     MAIN_MENU_BLOCK_KEYS,
     SETTINGS_BLOCK_KEY,
@@ -94,10 +93,9 @@ async def build_statistics_panel_text(
     if result.couple is None:
         return "📊 <b>Статистика</b>\n\nПара пока не найдена."
 
-    members = await CoupleRepository(session).get_users_for_couple(result.couple.id)
     local_now = datetime.now(timezone.utc).astimezone(get_timezone(result.couple.timezone or "Europe/Moscow"))
-    return await AnalyticsService(session).build_recap_text(
-        member_ids=[member.id for member in members],
+    return await AnalyticsService(session).build_recap_text_for_couple(
+        couple=result.couple,
         local_now=local_now,
         period=period,
     )

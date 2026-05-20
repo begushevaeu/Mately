@@ -46,6 +46,8 @@ If local Windows networking blocks direct Python access to the Docker-published 
 docker compose run --rm bot python -m alembic upgrade head
 ```
 
+The Docker bot container runs migrations automatically on startup when `RUN_MIGRATIONS=true`.
+
 ## Required Environment Variables
 
 - `BOT_TOKEN` - Telegram bot token from BotFather.
@@ -54,3 +56,24 @@ docker compose run --rm bot python -m alembic upgrade head
 - `LOG_LEVEL` - application log level.
 - `SQL_ECHO` - SQLAlchemy query logging toggle.
 - `DEFAULT_TIMEZONE` - fallback timezone for couple reminders.
+- `INVITE_CODE_TTL_HOURS` - invite code lifetime in hours.
+- `RUN_MIGRATIONS` - run Alembic migrations before starting the bot container.
+
+## Deployment Notes
+
+The MVP is deployment-ready as a single polling bot process with PostgreSQL:
+
+- Railway/Render: deploy from the Dockerfile, attach a PostgreSQL database, set the env vars above, and keep `RUN_MIGRATIONS=true`.
+- VPS: use Docker Compose, keep `.env` outside Git, and run `docker compose up -d --build`.
+- Do not run more than one polling bot instance for the same token at the same time.
+
+## Architecture Guardrails
+
+The code is intentionally kept in the `handlers -> services -> repositories` shape:
+
+- handlers own Telegram UX only;
+- services own business rules;
+- repositories own database access;
+- schedulers and notifications call services instead of embedding SQL.
+
+Mately should stay small: short flows, clear buttons, and calm shared-household behavior over deep menus or heavy forms.

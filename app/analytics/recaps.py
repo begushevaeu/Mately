@@ -5,8 +5,9 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ContentItem, Task
+from app.models import ContentItem, Couple, Task
 from app.repositories.content import ContentRepository
+from app.repositories.couples import CoupleRepository
 from app.repositories.tasks import TaskRepository
 
 ACTIVE_TASK_STATUSES = {"OPEN", "ASSIGNED", "OVERDUE"}
@@ -49,8 +50,17 @@ class RecapStats:
 
 class AnalyticsService:
     def __init__(self, session: AsyncSession) -> None:
+        self.couples = CoupleRepository(session)
         self.tasks = TaskRepository(session)
         self.content = ContentRepository(session)
+
+    async def build_recap_text_for_couple(self, *, couple: Couple, local_now: datetime, period: str) -> str:
+        members = await self.couples.get_users_for_couple(couple.id)
+        return await self.build_recap_text(
+            member_ids=[member.id for member in members],
+            local_now=local_now,
+            period=period,
+        )
 
     async def build_recap_text(self, *, member_ids: list[int], local_now: datetime, period: str) -> str:
         tasks = await self.tasks.list_for_users(member_ids)

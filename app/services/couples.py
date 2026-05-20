@@ -14,6 +14,8 @@ from app.repositories.users import UserRepository
 
 INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 INVITE_CODE_LENGTH = 8
+MAX_TELEGRAM_ID = 2**63 - 1
+MAX_PROFILE_TEXT_LENGTH = 255
 
 
 class OnboardingStatus(StrEnum):
@@ -52,6 +54,34 @@ def normalize_invite_code(invite_code: str) -> str:
     )
 
 
+def is_valid_invite_code(invite_code: str) -> bool:
+    return len(invite_code) == INVITE_CODE_LENGTH and all(character in INVITE_CODE_ALPHABET for character in invite_code)
+
+
+def validate_telegram_id(telegram_id: int) -> int:
+    if not isinstance(telegram_id, int) or telegram_id <= 0 or telegram_id > MAX_TELEGRAM_ID:
+        raise ValueError("invalid Telegram user id")
+    return telegram_id
+
+
+def normalize_profile_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = " ".join(value.strip().split())
+    if not normalized:
+        return None
+    return normalized[:MAX_PROFILE_TEXT_LENGTH]
+
+
+def normalize_telegram_profile(profile: TelegramUserProfile) -> TelegramUserProfile:
+    return TelegramUserProfile(
+        telegram_id=validate_telegram_id(profile.telegram_id),
+        username=normalize_profile_text(profile.username),
+        first_name=normalize_profile_text(profile.first_name),
+    )
+
+
 class CoupleService:
     def __init__(
         self,
@@ -68,6 +98,7 @@ class CoupleService:
         self.couples = couples or CoupleRepository(session)  # type: ignore[arg-type]
 
     async def get_or_register_user(self, profile: TelegramUserProfile) -> User:
+        profile = normalize_telegram_profile(profile)
         user = await self.users.get_by_telegram_id(profile.telegram_id)
         if user is None:
             return await self.users.create(
@@ -131,10 +162,14 @@ class CoupleService:
             return current_state
 
         normalized_code = normalize_invite_code(invite_code)
+        if not is_valid_invite_code(normalized_code):
+            return OnboardingResult(status=OnboardingStatus.INVALID_OR_EXPIRED_INVITE, user=user)
+
         couple = await self.couples.get_by_invite_code(normalized_code)
         if couple is None or self._is_invite_expired(couple):
             return OnboardingResult(status=OnboardingStatus.INVALID_OR_EXPIRED_INVITE, user=user)
 
+        await self.couples.lock_by_id(couple.id)
         member_count = await self.couples.count_members(couple.id)
         if member_count >= 2:
             return OnboardingResult(status=OnboardingStatus.COUPLE_FULL, user=user, couple=couple)
