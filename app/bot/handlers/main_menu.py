@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
@@ -31,12 +32,14 @@ from app.bot.keyboards.statistics import (
 from app.services.chat_blocks import (
     ADDITIONAL_BLOCK_KEY,
     MAIN_MENU_BLOCK_KEYS,
+    MENU_HINT_BLOCK_KEY,
     ChatBlockService,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 from app.utils.dates import get_timezone
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 async def ensure_main_menu_access(message: Message, session: AsyncSession) -> OnboardingResult | None:
@@ -58,6 +61,16 @@ async def get_current_result_for_callback(callback: CallbackQuery, session: Asyn
         first_name=callback.from_user.first_name,
     )
     return await CoupleService(session).start_for_profile(profile)
+
+
+async def delete_irrelevant_user_message(bot: Bot, message: Message) -> bool:
+    try:
+        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    except TelegramAPIError:
+        logger.debug("Failed to delete irrelevant user message", exc_info=True)
+        return False
+
+    return True
 
 
 async def show_main_menu_block(
@@ -85,6 +98,34 @@ async def show_main_menu_block(
         chat_id=message.chat.id,
         block_key=block_key,
         messages=[message, sent_message],
+    )
+
+
+async def show_menu_hint_for_irrelevant_message(
+    *,
+    message: Message,
+    session: AsyncSession,
+    bot: Bot,
+    result: OnboardingResult,
+) -> None:
+    blocks = ChatBlockService(session)
+    await blocks.reset_block(
+        bot=bot,
+        user=result.user,
+        chat_id=message.chat.id,
+        block_key=MENU_HINT_BLOCK_KEY,
+    )
+    deleted = await delete_irrelevant_user_message(bot, message)
+    sent_message = await message.answer(
+        "Я убрала лишнее сообщение и обновила меню. Выбери раздел кнопкой ниже или нажми /menu.",
+        reply_markup=build_main_menu(),
+    )
+    messages_to_remember = [sent_message] if deleted else [message, sent_message]
+    await blocks.remember_messages(
+        user=result.user,
+        chat_id=message.chat.id,
+        block_key=MENU_HINT_BLOCK_KEY,
+        messages=messages_to_remember,
     )
 
 
@@ -234,8 +275,8 @@ async def handle_additional_settings(callback: CallbackQuery, session: AsyncSess
     await callback.answer()
 
 
-@router.message(F.text)
-async def handle_unknown_menu_text(message: Message, session: AsyncSession) -> None:
+@router.message()
+async def handle_unknown_menu_text(message: Message, session: AsyncSession, bot: Bot) -> None:
     result = await get_current_onboarding_result(message, session)
     if result is None:
         return
@@ -244,7 +285,9 @@ async def handle_unknown_menu_text(message: Message, session: AsyncSession) -> N
         await answer_for_onboarding_state(message, result)
         return
 
-    await message.answer(
-        "Я пока не знаю такую команду. Выберите раздел из меню.",
-        reply_markup=build_main_menu(),
+    await show_menu_hint_for_irrelevant_message(
+        message=message,
+        session=session,
+        bot=bot,
+        result=result,
     )

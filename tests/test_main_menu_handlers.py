@@ -5,7 +5,7 @@ import pytest
 from app.bot.handlers import main_menu
 from app.bot.keyboards.blocks import close_block_callback
 from app.models import Couple, User
-from app.services.chat_blocks import CONTENT_BLOCK_KEY, TASKS_BLOCK_KEY
+from app.services.chat_blocks import CONTENT_BLOCK_KEY, MENU_HINT_BLOCK_KEY, TASKS_BLOCK_KEY
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 
@@ -18,10 +18,12 @@ class FakeMessage:
         self.message_id = message_id
         self.chat = FakeChat()
         self.answers: list[str] = []
+        self.answer_kwargs: list[dict] = []
         self.sent_messages: list[FakeMessage] = []
 
-    async def answer(self, text: str, **_) -> "FakeMessage":
+    async def answer(self, text: str, **kwargs) -> "FakeMessage":
         self.answers.append(text)
+        self.answer_kwargs.append(kwargs)
         sent_message = FakeMessage(message_id=1000 + len(self.sent_messages))
         self.sent_messages.append(sent_message)
         return sent_message
@@ -167,3 +169,27 @@ async def test_close_block_callback_resets_current_block_and_clears_state(monkey
     assert state.clear_called is True
     assert FakeChatBlockService.reset_block_key == TASKS_BLOCK_KEY
     assert bot.deleted_messages == [(100, 77)]
+
+
+@pytest.mark.asyncio
+async def test_unknown_message_is_deleted_and_restores_reply_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user)
+    message = FakeMessage(message_id=88)
+    bot = FakeBot()
+    FakeChatBlockService.reset_block_key = None
+    FakeChatBlockService.remembered_message_ids = []
+
+    async def fake_get_current_onboarding_result(*_, **__) -> OnboardingResult:
+        return result
+
+    monkeypatch.setattr(main_menu, "get_current_onboarding_result", fake_get_current_onboarding_result)
+    monkeypatch.setattr(main_menu, "ChatBlockService", FakeChatBlockService)
+
+    await main_menu.handle_unknown_menu_text(message, session=None, bot=bot)
+
+    assert bot.deleted_messages == [(100, 88)]
+    assert FakeChatBlockService.reset_block_key == MENU_HINT_BLOCK_KEY
+    assert FakeChatBlockService.remembered_message_ids == [1000]
+    assert message.answers == ["Я убрала лишнее сообщение и обновила меню. Выбери раздел кнопкой ниже или нажми /menu."]
+    assert "reply_markup" in message.answer_kwargs[0]

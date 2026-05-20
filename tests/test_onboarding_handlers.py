@@ -120,7 +120,7 @@ async def test_cancel_clears_state_resets_blocks_and_returns_to_safe_menu(monkey
 
     assert events == [
         "clear_state",
-        "reset_blocks:tasks,content,shopping,places,additional,statistics,settings,onboarding,partner_alias",
+        "reset_blocks:tasks,content,shopping,places,additional,menu_hint,statistics,settings,onboarding,partner_alias",
         "answer:IN_COUPLE",
     ]
     assert len(message.sent_messages) == 1
