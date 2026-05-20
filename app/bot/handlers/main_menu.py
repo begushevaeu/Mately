@@ -1,13 +1,15 @@
+from datetime import datetime, timezone
+
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import AnalyticsService
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.blocks import (
     CLOSE_BLOCK_CALLBACK_PREFIX,
-    build_close_block_keyboard,
     parse_close_block_callback,
 )
 from app.bot.keyboards.main_menu import (
@@ -16,6 +18,12 @@ from app.bot.keyboards.main_menu import (
     build_main_menu,
 )
 from app.bot.keyboards.settings import build_settings_keyboard
+from app.bot.keyboards.statistics import (
+    STATISTICS_MONTH_CALLBACK,
+    STATISTICS_WEEK_CALLBACK,
+    build_statistics_keyboard,
+)
+from app.repositories.couples import CoupleRepository
 from app.services.chat_blocks import (
     MAIN_MENU_BLOCK_KEYS,
     SETTINGS_BLOCK_KEY,
@@ -23,6 +31,7 @@ from app.services.chat_blocks import (
     ChatBlockService,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
+from app.utils.dates import get_timezone
 
 router = Router()
 
@@ -57,6 +66,7 @@ async def show_main_menu_block(
     block_key: str,
     text: str,
     reply_markup,
+    parse_mode: str | None = None,
 ) -> None:
     blocks = ChatBlockService(session)
     await blocks.reset_other_blocks(
@@ -66,12 +76,30 @@ async def show_main_menu_block(
         current_block_key=block_key,
     )
     await blocks.reset_block(bot=bot, user=result.user, chat_id=message.chat.id, block_key=block_key)
-    sent_message = await message.answer(text, reply_markup=reply_markup)
+    sent_message = await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
     await blocks.remember_messages(
         user=result.user,
         chat_id=message.chat.id,
         block_key=block_key,
         messages=[message, sent_message],
+    )
+
+
+async def build_statistics_panel_text(
+    session: AsyncSession,
+    result: OnboardingResult,
+    *,
+    period: str,
+) -> str:
+    if result.couple is None:
+        return "📊 <b>Статистика</b>\n\nПара пока не найдена."
+
+    members = await CoupleRepository(session).get_users_for_couple(result.couple.id)
+    local_now = datetime.now(timezone.utc).astimezone(get_timezone(result.couple.timezone or "Europe/Moscow"))
+    return await AnalyticsService(session).build_recap_text(
+        member_ids=[member.id for member in members],
+        local_now=local_now,
+        period=period,
     )
 
 
@@ -108,15 +136,34 @@ async def handle_statistics_menu(message: Message, session: AsyncSession, bot: B
     if result is None:
         return
 
+    text = await build_statistics_panel_text(session, result, period="week")
     await show_main_menu_block(
         message=message,
         session=session,
         bot=bot,
         result=result,
         block_key=STATISTICS_BLOCK_KEY,
-        text="Статистика появится после первых задач и отметок контента. Пока тут будет тихий уголок ожидания.",
-        reply_markup=build_close_block_keyboard(STATISTICS_BLOCK_KEY),
+        text=text,
+        reply_markup=build_statistics_keyboard(),
+        parse_mode="HTML",
     )
+
+
+@router.callback_query(F.data.in_({STATISTICS_WEEK_CALLBACK, STATISTICS_MONTH_CALLBACK}))
+async def handle_statistics_period(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer()
+        return
+
+    result = await get_current_result_for_callback(callback, session)
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        await callback.answer()
+        return
+
+    period = "month" if callback.data == STATISTICS_MONTH_CALLBACK else "week"
+    text = await build_statistics_panel_text(session, result, period=period)
+    await callback.message.edit_text(text, reply_markup=build_statistics_keyboard(), parse_mode="HTML")
+    await callback.answer()
 
 
 @router.message(F.text == SETTINGS_BUTTON)

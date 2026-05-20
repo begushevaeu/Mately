@@ -26,10 +26,12 @@ def test_scheduler_dedupe_keys_use_local_periods() -> None:
     couple = Couple(id=10, invite_code="ABC12345", timezone="Europe/Moscow")
     user = User(id=20, telegram_id=200, username=None, first_name=None)
     monday = datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+    first_day = datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)
 
     assert build_dedupe_key(couple, user, "morning_reminder", monday) == "morning_reminder:couple:10:user:20:2026-05-18"
     assert build_dedupe_key(couple, user, "weekly_recap", monday) == "weekly_recap:couple:10:user:20:2026-W21"
     assert build_dedupe_key(couple, user, "monthly_recap", monday) == "monthly_recap:couple:10:user:20:2026-05"
+    assert build_dedupe_key(couple, user, "monthly_recap", first_day) == "monthly_recap:couple:10:user:20:2026-05"
 
 
 def test_scheduler_records_local_scheduled_time_in_utc() -> None:

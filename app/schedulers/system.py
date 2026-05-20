@@ -8,16 +8,15 @@ from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analytics import AnalyticsService
 from app.models import Couple, Task, User
 from app.notifications.cats import CatNotificationType
 from app.notifications.delivery import send_user_notification
-from app.repositories.content import ContentRepository
 from app.repositories.couples import CoupleRepository
 from app.repositories.notifications import NotificationRepository
 from app.repositories.shopping import ShoppingRepository
 from app.repositories.tasks import TaskRepository
 from app.schedulers.shopping import archive_expired_shopping_items
-from app.services.content import content_summary_counts
 from app.services.tasks import CoupleTaskContext, TaskService
 from app.utils.dates import get_timezone
 
@@ -246,22 +245,10 @@ async def build_evening_reminder_text(
 
 
 async def build_recap_text(session: AsyncSession, context: CoupleScheduleContext, *, period: str) -> str:
-    start = period_start(context.local_now, period).astimezone(timezone.utc)
-    tasks = await TaskRepository(session).list_for_users(context.member_ids)
-    content_items = await ContentRepository(session).list_for_users(context.member_ids)
-    planned_content_count, completed_content_count = content_summary_counts(content_items)
-    completed_tasks_count = len(
-        [
-            task
-            for task in tasks
-            if task.completed_at is not None and task.completed_at >= start
-        ]
-    )
-    label = "Недельная" if period == "week" else "Месячная"
-    return (
-        f"{label} сводка: закрыто задач за период: {completed_tasks_count}. "
-        f"Контента завершено всего: {completed_content_count}, в планах: {planned_content_count}. "
-        "Котики передают аккуратный знак одобрения."
+    return await AnalyticsService(session).build_recap_text(
+        member_ids=context.member_ids,
+        local_now=context.local_now,
+        period=period,
     )
 
 
@@ -302,14 +289,8 @@ def build_dedupe_key(couple: Couple, user: User, notification_type: str, local_n
     if notification_type == "weekly_recap":
         period_key = f"{local_now.isocalendar().year}-W{local_now.isocalendar().week:02d}"
     elif notification_type == "monthly_recap":
-        period_key = local_now.strftime("%Y-%m")
+        recap_month = local_now.replace(day=1) - timedelta(days=1) if local_now.day == 1 else local_now
+        period_key = recap_month.strftime("%Y-%m")
     else:
         period_key = local_now.strftime("%Y-%m-%d")
     return f"{notification_type}:couple:{couple.id}:user:{user.id}:{period_key}"
-
-
-def period_start(local_now: datetime, period: str) -> datetime:
-    local_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if period == "week":
-        return local_start - timedelta(days=7)
-    return local_start.replace(day=1)
