@@ -13,7 +13,7 @@ class PlaceItem(CreatedAtMixin, Base):
     __tablename__ = "place_items"
     __table_args__ = (
         CheckConstraint(
-            "category in ('RESTAURANT', 'CAFE', 'CINEMA', 'THEATRE', 'PARK', 'MUSEUM', 'BAR', 'CONCERT', 'EXHIBITION', 'WALK', 'TRIP', 'OTHER')",
+            "category in ('RESTAURANT', 'CAFE', 'CINEMA', 'THEATRE', 'PARK', 'MUSEUM', 'BAR', 'CONCERT', 'EXHIBITION', 'SHOW', 'TRIP', 'OTHER')",
             name="place_item_category",
         ),
         CheckConstraint("status in ('NOT_VISITED', 'VISITED')", name="place_item_status"),

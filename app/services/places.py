@@ -29,7 +29,7 @@ class PlaceCategory(StrEnum):
     BAR = "BAR"
     CONCERT = "CONCERT"
     EXHIBITION = "EXHIBITION"
-    WALK = "WALK"
+    SHOW = "SHOW"
     TRIP = "TRIP"
     OTHER = "OTHER"
 
@@ -44,7 +44,7 @@ CATEGORY_LABELS = {
     PlaceCategory.BAR: "🍸 Бар",
     PlaceCategory.CONCERT: "🎵 Концерт",
     PlaceCategory.EXHIBITION: "🖼️ Выставка",
-    PlaceCategory.WALK: "🚶 Прогулка",
+    PlaceCategory.SHOW: "🎟️ Шоу",
     PlaceCategory.TRIP: "🚆 Поездка",
     PlaceCategory.OTHER: "✨ Другое",
 }

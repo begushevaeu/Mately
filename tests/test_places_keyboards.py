@@ -37,6 +37,8 @@ def test_place_category_keyboard_contains_date_categories() -> None:
     assert "☕ Кафе" in texts
     assert "🎭 Театр" in texts
     assert "🌳 Парк" in texts
+    assert "🎟️ Шоу" in texts
+    assert "🚶 Прогулка" not in texts
     assert "✨ Другое" in texts
 
 
