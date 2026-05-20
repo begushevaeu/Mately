@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import append_cozy_suffix
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.main_menu import TASKS_BUTTON
 from app.bot.keyboards.tasks import (
@@ -111,8 +112,13 @@ async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
     if result.notification_user is None or result.notification_text is None:
         return
 
+    notification_text = await append_cozy_suffix(
+        result.notification_text,
+        theme=result.cozy_theme,
+        subject=result.cozy_subject,
+    )
     try:
-        await bot.send_message(result.notification_user.telegram_id, result.notification_text)
+        await bot.send_message(result.notification_user.telegram_id, notification_text)
     except TelegramAPIError:
         logger.exception("Failed to send task notification")
 

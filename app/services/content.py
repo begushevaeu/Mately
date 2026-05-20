@@ -7,6 +7,7 @@ from html import escape
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import CozyMessageTheme
 from app.models import Comment, ContentItem, Couple, Rating, User
 from app.repositories.content import ContentRepository
 from app.repositories.couples import CoupleRepository
@@ -85,6 +86,8 @@ class ContentMutationResult:
     item: ContentItem
     notification_user: User | None = None
     notification_text: str | None = None
+    cozy_theme: CozyMessageTheme | None = None
+    cozy_subject: str | None = None
 
 
 class ContentService:
@@ -147,6 +150,8 @@ class ContentService:
                 f"{actor_label.nominative_with_emoji} отметил(а) «{item.title}» как завершённое. "
                 "Хочешь поставить оценку?"
             ),
+            cozy_theme=CozyMessageTheme.CONTENT_COMPLETED,
+            cozy_subject=item.title,
         )
 
     async def save_rating(

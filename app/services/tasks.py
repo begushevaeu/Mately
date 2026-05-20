@@ -8,6 +8,7 @@ from html import escape
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import CozyMessageTheme
 from app.models import Couple, Task, User
 from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
@@ -50,6 +51,8 @@ class TaskMutationResult:
     task: Task
     notification_user: User | None = None
     notification_text: str | None = None
+    cozy_theme: CozyMessageTheme | None = None
+    cozy_subject: str | None = None
     next_task: Task | None = None
 
 
@@ -235,6 +238,8 @@ class TaskService:
                 task=task,
                 notification_user=partner,
                 notification_text=f"От {actor_label.genitive_with_emoji}: тебе назначили задачу «{task.title}».",
+                cozy_theme=CozyMessageTheme.TASK_ASSIGNED,
+                cozy_subject=task.title,
             )
 
         if creation_input.assignment_type is AssignmentType.POOL and partner is not None:
@@ -243,6 +248,8 @@ class TaskService:
                 task=task,
                 notification_user=partner,
                 notification_text=f"От {actor_label.genitive_with_emoji}: в ярмарке задач появилась «{task.title}».",
+                cozy_theme=CozyMessageTheme.TASK_ASSIGNED,
+                cozy_subject=task.title,
             )
 
         return TaskMutationResult(task=task)
@@ -270,7 +277,13 @@ class TaskService:
         partner = context.partner
         actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
         notification_text = f"{actor_label.nominative_with_emoji} взял(а) задачу «{task.title}»."
-        return TaskMutationResult(task=task, notification_user=partner, notification_text=notification_text)
+        return TaskMutationResult(
+            task=task,
+            notification_user=partner,
+            notification_text=notification_text,
+            cozy_theme=CozyMessageTheme.TASK_CLAIMED,
+            cozy_subject=task.title,
+        )
 
     async def complete_task(self, current_user: User, task_id: int) -> TaskMutationResult:
         context = await self.get_context(current_user)
@@ -290,6 +303,8 @@ class TaskService:
             task=task,
             notification_user=partner,
             notification_text=notification_text,
+            cozy_theme=CozyMessageTheme.TASK_COMPLETED,
+            cozy_subject=task.title,
             next_task=next_task,
         )
 
@@ -308,6 +323,8 @@ class TaskService:
             task=task,
             notification_user=partner,
             notification_text=f"{actor_label.nominative_with_emoji} {action_text} «{task.title}».",
+            cozy_theme=CozyMessageTheme.TASK_ARCHIVED,
+            cozy_subject=task.title,
         )
 
     async def build_task_card(self, context: CoupleTaskContext, task: Task, *, show_ownership: bool = False) -> str:

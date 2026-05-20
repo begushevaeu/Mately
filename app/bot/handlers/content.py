@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import append_cozy_suffix
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.content import (
     ADD_CONTENT_CALLBACK,
@@ -133,10 +134,15 @@ async def send_content_notification(bot: Bot, result: ContentMutationResult) -> 
     if result.notification_user is None or result.notification_text is None:
         return
 
+    notification_text = await append_cozy_suffix(
+        result.notification_text,
+        theme=result.cozy_theme,
+        subject=result.cozy_subject,
+    )
     try:
         await bot.send_message(
             result.notification_user.telegram_id,
-            result.notification_text,
+            notification_text,
             reply_markup=build_content_notification_keyboard(result.item.id),
         )
     except TelegramAPIError:
