@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 import pytest
 
 from app.bot.handlers import main_menu
+from app.bot.keyboards.blocks import close_block_callback
 from app.models import Couple, User
-from app.services.chat_blocks import CONTENT_BLOCK_KEY
+from app.services.chat_blocks import CONTENT_BLOCK_KEY, TASKS_BLOCK_KEY
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 
@@ -24,6 +25,39 @@ class FakeMessage:
         sent_message = FakeMessage(message_id=1000 + len(self.sent_messages))
         self.sent_messages.append(sent_message)
         return sent_message
+
+
+class FakeCallbackUser:
+    id = 100
+    username = None
+    first_name = None
+
+
+class FakeCallback:
+    def __init__(self, data: str, message: FakeMessage | None = None) -> None:
+        self.data = data
+        self.message = message
+        self.from_user = FakeCallbackUser()
+        self.answer_called = False
+
+    async def answer(self, *_, **__) -> None:
+        self.answer_called = True
+
+
+class FakeState:
+    def __init__(self) -> None:
+        self.clear_called = False
+
+    async def clear(self) -> None:
+        self.clear_called = True
+
+
+class FakeBot:
+    def __init__(self) -> None:
+        self.deleted_messages: list[tuple[int, int]] = []
+
+    async def delete_message(self, *, chat_id: int, message_id: int) -> None:
+        self.deleted_messages.append((chat_id, message_id))
 
 
 class FakeChatBlockService:
@@ -110,3 +144,26 @@ async def test_main_menu_block_resets_previous_blocks_and_remembers_current(monk
     assert FakeChatBlockService.reset_other_block_key == CONTENT_BLOCK_KEY
     assert FakeChatBlockService.reset_block_key == CONTENT_BLOCK_KEY
     assert FakeChatBlockService.remembered_message_ids == [42, 1000]
+
+
+@pytest.mark.asyncio
+async def test_close_block_callback_resets_current_block_and_clears_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user)
+    callback = FakeCallback(data=close_block_callback(TASKS_BLOCK_KEY), message=FakeMessage(message_id=77))
+    state = FakeState()
+    bot = FakeBot()
+    FakeChatBlockService.reset_block_key = None
+
+    async def fake_get_current_result_for_callback(*_, **__) -> OnboardingResult:
+        return result
+
+    monkeypatch.setattr(main_menu, "get_current_result_for_callback", fake_get_current_result_for_callback)
+    monkeypatch.setattr(main_menu, "ChatBlockService", FakeChatBlockService)
+
+    await main_menu.handle_close_block(callback, state, session=None, bot=bot)
+
+    assert callback.answer_called is True
+    assert state.clear_called is True
+    assert FakeChatBlockService.reset_block_key == TASKS_BLOCK_KEY
+    assert bot.deleted_messages == [(100, 77)]

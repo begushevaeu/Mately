@@ -1,6 +1,8 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.keyboards.blocks import with_close_button
 from app.models import Task
+from app.services.chat_blocks import TASKS_BLOCK_KEY
 
 TASKS_MENU_CALLBACK = "tasks:menu"
 ADD_TASK_CALLBACK = "tasks:add"
@@ -47,7 +49,7 @@ def build_tasks_menu(*, has_pool_tasks: bool = False) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Все активные", callback_data=ALL_TASKS_CALLBACK)],
         ]
     )
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+    return with_close_button(InlineKeyboardMarkup(inline_keyboard=keyboard), TASKS_BLOCK_KEY)
 
 
 def build_task_list_keyboard(
@@ -77,67 +79,82 @@ def build_task_list_keyboard(
             keyboard.append([archive_button])
 
     keyboard.append([InlineKeyboardButton(text="Назад к задачам", callback_data=TASKS_MENU_CALLBACK)])
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+    return with_close_button(InlineKeyboardMarkup(inline_keyboard=keyboard), TASKS_BLOCK_KEY)
 
 
 def build_task_creation_cancel_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
-        ]
+    return with_close_button(
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
+            ]
+        ),
+        TASKS_BLOCK_KEY,
     )
 
 
 def build_recurring_choice_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=ONE_TIME_TASK_BUTTON, callback_data=TASK_CREATE_ONE_TIME_CALLBACK),
-                InlineKeyboardButton(text=RECURRING_TASK_BUTTON, callback_data=TASK_CREATE_RECURRING_CALLBACK),
-            ],
-            [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
-        ]
+    return with_close_button(
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=ONE_TIME_TASK_BUTTON, callback_data=TASK_CREATE_ONE_TIME_CALLBACK),
+                    InlineKeyboardButton(text=RECURRING_TASK_BUTTON, callback_data=TASK_CREATE_RECURRING_CALLBACK),
+                ],
+                [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
+            ]
+        ),
+        TASKS_BLOCK_KEY,
     )
 
 
 def build_recurrence_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=DAILY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_DAILY_CALLBACK),
-                InlineKeyboardButton(text=WEEKLY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_WEEKLY_CALLBACK),
-            ],
-            [
-                InlineKeyboardButton(text=MONTHLY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_MONTHLY_CALLBACK),
-                InlineKeyboardButton(text=CUSTOM_RECURRENCE_BUTTON, callback_data=TASK_CREATE_CUSTOM_CALLBACK),
-            ],
-            [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
-        ]
+    return with_close_button(
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=DAILY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_DAILY_CALLBACK),
+                    InlineKeyboardButton(text=WEEKLY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_WEEKLY_CALLBACK),
+                ],
+                [
+                    InlineKeyboardButton(text=MONTHLY_RECURRENCE_BUTTON, callback_data=TASK_CREATE_MONTHLY_CALLBACK),
+                    InlineKeyboardButton(text=CUSTOM_RECURRENCE_BUTTON, callback_data=TASK_CREATE_CUSTOM_CALLBACK),
+                ],
+                [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
+            ]
+        ),
+        TASKS_BLOCK_KEY,
     )
 
 
 def build_assignment_keyboard(partner_button_text: str | None = None) -> InlineKeyboardMarkup:
     partner_button_text = partner_button_text or ASSIGN_PARTNER_BUTTON
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=ASSIGN_SELF_BUTTON, callback_data=TASK_CREATE_ASSIGN_SELF_CALLBACK),
-                InlineKeyboardButton(text=partner_button_text, callback_data=TASK_CREATE_ASSIGN_PARTNER_CALLBACK),
-            ],
-            [InlineKeyboardButton(text=ASSIGN_POOL_BUTTON, callback_data=TASK_CREATE_ASSIGN_POOL_CALLBACK)],
-            [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
-        ]
+    return with_close_button(
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=ASSIGN_SELF_BUTTON, callback_data=TASK_CREATE_ASSIGN_SELF_CALLBACK),
+                    InlineKeyboardButton(text=partner_button_text, callback_data=TASK_CREATE_ASSIGN_PARTNER_CALLBACK),
+                ],
+                [InlineKeyboardButton(text=ASSIGN_POOL_BUTTON, callback_data=TASK_CREATE_ASSIGN_POOL_CALLBACK)],
+                [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
+            ]
+        ),
+        TASKS_BLOCK_KEY,
     )
 
 
 def build_deadline_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=TODAY_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_TODAY_CALLBACK),
-                InlineKeyboardButton(text=TOMORROW_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_TOMORROW_CALLBACK),
-            ],
-            [InlineKeyboardButton(text=NO_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_NONE_CALLBACK)],
-            [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
-        ]
+    return with_close_button(
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=TODAY_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_TODAY_CALLBACK),
+                    InlineKeyboardButton(text=TOMORROW_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_TOMORROW_CALLBACK),
+                ],
+                [InlineKeyboardButton(text=NO_DEADLINE_BUTTON, callback_data=TASK_CREATE_DEADLINE_NONE_CALLBACK)],
+                [InlineKeyboardButton(text="Отмена", callback_data=TASK_CREATE_CANCEL_CALLBACK)],
+            ]
+        ),
+        TASKS_BLOCK_KEY,
     )

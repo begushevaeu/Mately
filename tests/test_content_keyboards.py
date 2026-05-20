@@ -1,3 +1,4 @@
+from app.bot.keyboards.blocks import close_block_callback
 from app.bot.keyboards.content import (
     ADD_CONTENT_CALLBACK,
     CONTENT_COMPLETED_CALLBACK,
@@ -8,6 +9,7 @@ from app.bot.keyboards.content import (
     build_content_reaction_keyboard,
 )
 from app.models import ContentItem
+from app.services.chat_blocks import CONTENT_BLOCK_KEY
 
 
 def extract_buttons(markup):
@@ -23,6 +25,8 @@ def test_content_menu_contains_core_actions() -> None:
         CONTENT_PLANNED_CALLBACK,
         CONTENT_COMPLETED_CALLBACK,
     ]
+    assert buttons[-1].text == "Закрыть"
+    assert buttons[-1].callback_data == close_block_callback(CONTENT_BLOCK_KEY)
 
 
 def test_content_list_keyboard_switches_action_by_status() -> None:
@@ -37,6 +41,7 @@ def test_content_list_keyboard_switches_action_by_status() -> None:
         "Оценить #2",
         "Комментарий #2",
         "Назад к контенту",
+        "Закрыть",
     ]
     assert buttons[0].callback_data == "content:complete:1"
     assert buttons[1].callback_data == "content:comment:1"
@@ -46,9 +51,10 @@ def test_content_list_keyboard_switches_action_by_status() -> None:
 
 def test_content_reaction_keyboard_uses_updated_reaction_set() -> None:
     markup = build_content_reaction_keyboard()
-    reaction_rows = markup.inline_keyboard[:-1]
+    reaction_rows = markup.inline_keyboard[:-2]
     buttons = extract_buttons(markup)
 
-    assert [button.text for button in buttons[:-1]] == ["❤️", "🤩", "🤡", "💩", "🔥", "😭", "🥴", "👍🏻", "👎🏻"]
+    assert [button.text for button in buttons[:-2]] == ["❤️", "🤩", "🤡", "💩", "🔥", "😭", "🥴", "👍🏻", "👎🏻"]
     assert [len(row) for row in reaction_rows] == [3, 3, 3]
-    assert buttons[-1].callback_data == CONTENT_EMOJI_SKIP_CALLBACK
+    assert buttons[-2].callback_data == CONTENT_EMOJI_SKIP_CALLBACK
+    assert buttons[-1].text == "Закрыть"

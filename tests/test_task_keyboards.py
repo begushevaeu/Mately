@@ -1,5 +1,7 @@
+from app.bot.keyboards.blocks import close_block_callback
 from app.bot.keyboards.tasks import MY_TASKS_CALLBACK, TASK_POOL_CALLBACK, build_task_list_keyboard, build_tasks_menu
 from app.models import Task
+from app.services.chat_blocks import TASKS_BLOCK_KEY
 
 
 def extract_button_labels(markup) -> list[str]:
@@ -10,6 +12,8 @@ def test_task_pool_menu_item_is_hidden_when_pool_is_empty() -> None:
     markup = build_tasks_menu(has_pool_tasks=False)
 
     assert "Ярмарка" not in extract_button_labels(markup)
+    assert markup.inline_keyboard[-1][0].text == "Закрыть"
+    assert markup.inline_keyboard[-1][0].callback_data == close_block_callback(TASKS_BLOCK_KEY)
 
 
 def test_task_pool_menu_item_is_first_when_pool_has_tasks() -> None:
@@ -51,6 +55,7 @@ def test_task_list_keyboard_shows_delete_and_stop_repeat_actions() -> None:
         "Готово #2",
         "Остановить повтор #2",
         "Назад к задачам",
+        "Закрыть",
     ]
     assert markup.inline_keyboard[1][0].callback_data == "tasks:archive:1"
     assert markup.inline_keyboard[3][0].callback_data == "tasks:archive:2"

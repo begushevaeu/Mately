@@ -1,5 +1,7 @@
+from app.bot.keyboards.blocks import close_block_callback
 from app.bot.keyboards.shopping import ADD_SHOPPING_ITEM_CALLBACK, build_shopping_keyboard
 from app.models import ShoppingItem
+from app.services.chat_blocks import SHOPPING_BLOCK_KEY
 
 
 def extract_buttons(markup):
@@ -14,5 +16,6 @@ def test_shopping_keyboard_shows_add_and_active_item_actions() -> None:
 
     assert buttons[0].text == "Добавить"
     assert buttons[0].callback_data == ADD_SHOPPING_ITEM_CALLBACK
-    assert [button.text for button in buttons] == ["Добавить", "Куплено #1"]
+    assert [button.text for button in buttons] == ["Добавить", "Куплено #1", "Закрыть"]
     assert buttons[1].callback_data == "shopping:bought:1"
+    assert buttons[2].callback_data == close_block_callback(SHOPPING_BLOCK_KEY)
