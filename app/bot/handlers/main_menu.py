@@ -20,10 +20,8 @@ from app.bot.keyboards.blocks import (
 )
 from app.bot.keyboards.main_menu import (
     ADDITIONAL_BUTTON,
-    PLACES_BUTTON,
     build_main_menu,
 )
-from app.bot.keyboards.places import build_places_keyboard
 from app.bot.keyboards.settings import build_settings_keyboard
 from app.bot.keyboards.statistics import (
     STATISTICS_MONTH_CALLBACK,
@@ -33,7 +31,6 @@ from app.bot.keyboards.statistics import (
 from app.services.chat_blocks import (
     ADDITIONAL_BLOCK_KEY,
     MAIN_MENU_BLOCK_KEYS,
-    PLACES_BLOCK_KEY,
     ChatBlockService,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
@@ -112,14 +109,6 @@ def build_additional_panel_text() -> str:
     return "✨ <b>Дополнительно</b>\n\nЗдесь живут настройки и статистика."
 
 
-def build_places_placeholder_text() -> str:
-    return (
-        "📍 <b>Места</b>\n\n"
-        "Скоро здесь можно будет сохранять места, куда хочется сходить, "
-        "а после посещения оставлять реакцию, оценку и комментарий."
-    )
-
-
 def build_settings_panel_text(result: OnboardingResult) -> str:
     timezone_name = result.couple.timezone if result.couple is not None else "Europe/Moscow"
     return (
@@ -154,24 +143,6 @@ async def handle_close_block(callback: CallbackQuery, state: FSMContext, session
         await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
     except TelegramAPIError:
         pass
-
-
-@router.message(F.text == PLACES_BUTTON)
-async def handle_places_menu(message: Message, session: AsyncSession, bot: Bot) -> None:
-    result = await ensure_main_menu_access(message, session)
-    if result is None:
-        return
-
-    await show_main_menu_block(
-        message=message,
-        session=session,
-        bot=bot,
-        result=result,
-        block_key=PLACES_BLOCK_KEY,
-        text=build_places_placeholder_text(),
-        reply_markup=build_places_keyboard(),
-        parse_mode="HTML",
-    )
 
 
 @router.message(F.text == ADDITIONAL_BUTTON)

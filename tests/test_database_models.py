@@ -15,6 +15,9 @@ EXPECTED_TABLES = {
     "content_items",
     "ratings",
     "comments",
+    "place_items",
+    "place_ratings",
+    "place_comments",
     "notifications",
 }
 
@@ -37,7 +40,7 @@ def test_core_tables_are_registered() -> None:
 
 
 def test_mvp_shared_tables_do_not_have_direct_couple_id_yet() -> None:
-    deferred_tables = {"tasks", "shopping_items", "content_items", "notifications"}
+    deferred_tables = {"tasks", "shopping_items", "content_items", "place_items", "notifications"}
 
     for table_name in deferred_tables:
         assert "couple_id" not in Base.metadata.tables[table_name].columns
@@ -50,6 +53,7 @@ def test_core_uniqueness_constraints_are_declared() -> None:
     assert "uq_partner_aliases_owner_partner" in constraint_names("partner_aliases", UniqueConstraint)
     assert "uq_chat_blocks_user_chat_block" in constraint_names("chat_blocks", UniqueConstraint)
     assert "uq_ratings_content_user" in constraint_names("ratings", UniqueConstraint)
+    assert "uq_place_ratings_place_user" in constraint_names("place_ratings", UniqueConstraint)
     assert "uq_notifications_dedupe_key" in constraint_names("notifications", UniqueConstraint)
 
 
@@ -59,6 +63,8 @@ def test_status_and_rating_check_constraints_are_declared() -> None:
     assert "ck_shopping_items_shopping_item_status" in constraint_names("shopping_items", CheckConstraint)
     assert "ck_content_items_content_item_status" in constraint_names("content_items", CheckConstraint)
     assert "ck_ratings_rating_score_range" in constraint_names("ratings", CheckConstraint)
+    assert "ck_place_items_place_item_status" in constraint_names("place_items", CheckConstraint)
+    assert "ck_place_ratings_place_rating_score_range" in constraint_names("place_ratings", CheckConstraint)
     assert "ck_notifications_notification_status" in constraint_names("notifications", CheckConstraint)
 
 
