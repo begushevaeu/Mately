@@ -117,7 +117,7 @@ async def show_menu_hint_for_irrelevant_message(
     )
     deleted = await delete_irrelevant_user_message(bot, message)
     sent_message = await message.answer(
-        "Я убрала лишнее сообщение и обновила меню. Выбери раздел кнопкой ниже или нажми /menu.",
+        "Выбери раздел кнопкой ниже или нажми /menu.",
         reply_markup=build_main_menu(),
     )
     messages_to_remember = [sent_message] if deleted else [message, sent_message]
