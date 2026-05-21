@@ -158,7 +158,7 @@ class CoupleService:
 
     async def join_couple(self, user: User, invite_code: str) -> OnboardingResult:
         current_state = await self.get_current_state(user)
-        if current_state.status is not OnboardingStatus.NO_COUPLE:
+        if current_state.status is OnboardingStatus.IN_COUPLE:
             return current_state
 
         normalized_code = normalize_invite_code(invite_code)
@@ -169,10 +169,28 @@ class CoupleService:
         if couple is None or self._is_invite_expired(couple):
             return OnboardingResult(status=OnboardingStatus.INVALID_OR_EXPIRED_INVITE, user=user)
 
+        current_waiting_couple = None
+        if current_state.status is OnboardingStatus.WAITING_FOR_PARTNER:
+            current_waiting_couple = current_state.couple
+            if current_waiting_couple is None:
+                return current_state
+            if couple.id == current_waiting_couple.id:
+                return current_state
+
         await self.couples.lock_by_id(couple.id)
         member_count = await self.couples.count_members(couple.id)
         if member_count >= 2:
             return OnboardingResult(status=OnboardingStatus.COUPLE_FULL, user=user, couple=couple)
+
+        if current_waiting_couple is not None:
+            await self.couples.lock_by_id(current_waiting_couple.id)
+            current_member_count = await self.couples.count_members(current_waiting_couple.id)
+            if current_member_count >= 2:
+                return await self.get_current_state(user)
+            await self.couples.remove_member_and_empty_couple(
+                user_id=user.id,
+                couple_id=current_waiting_couple.id,
+            )
 
         await self.couples.add_member(user_id=user.id, couple_id=couple.id)
         return OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user, couple=couple)

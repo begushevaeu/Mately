@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -59,3 +59,15 @@ class CoupleRepository:
         self.session.add(member)
         await self.session.flush()
         return member
+
+    async def remove_member_and_empty_couple(self, user_id: int, couple_id: int) -> None:
+        await self.session.execute(
+            delete(CoupleMember).where(
+                CoupleMember.user_id == user_id,
+                CoupleMember.couple_id == couple_id,
+            )
+        )
+        member_count = await self.count_members(couple_id)
+        if member_count == 0:
+            await self.session.execute(delete(Couple).where(Couple.id == couple_id))
+        await self.session.flush()

@@ -85,6 +85,15 @@ class FakeCoupleRepository:
         self.memberships.append(membership)
         return membership
 
+    async def remove_member_and_empty_couple(self, user_id: int, couple_id: int) -> None:
+        self.memberships = [
+            membership
+            for membership in self.memberships
+            if not (membership.user_id == user_id and membership.couple_id == couple_id)
+        ]
+        if not any(membership.couple_id == couple_id for membership in self.memberships):
+            self.couples.pop(couple_id, None)
+
 
 def build_service() -> CoupleService:
     users = FakeUserRepository()
@@ -123,6 +132,26 @@ async def test_user_can_create_couple_and_partner_can_join() -> None:
     assert created_result.status is OnboardingStatus.WAITING_FOR_PARTNER
     assert joined_result.status is OnboardingStatus.IN_COUPLE
     assert (await service.get_current_state(creator)).status is OnboardingStatus.IN_COUPLE
+
+
+@pytest.mark.asyncio
+async def test_waiting_user_can_join_partner_code_after_creating_empty_couple() -> None:
+    service = build_service()
+    repositories = service.fake_repositories  # type: ignore[attr-defined]
+    creator = await service.get_or_register_user(TelegramUserProfile(telegram_id=1, username="one", first_name="One"))
+    partner = await service.get_or_register_user(TelegramUserProfile(telegram_id=2, username="two", first_name="Two"))
+
+    creator_result = await service.create_couple(creator)
+    partner_result = await service.create_couple(partner)
+    joined_result = await service.join_couple(partner, creator_result.invite_code or "")
+
+    assert creator_result.status is OnboardingStatus.WAITING_FOR_PARTNER
+    assert partner_result.status is OnboardingStatus.WAITING_FOR_PARTNER
+    assert joined_result.status is OnboardingStatus.IN_COUPLE
+    assert joined_result.couple == creator_result.couple
+    assert (await service.get_current_state(creator)).status is OnboardingStatus.IN_COUPLE
+    assert partner_result.couple is not None
+    assert partner_result.couple.id not in repositories.couples.couples
 
 
 @pytest.mark.asyncio
