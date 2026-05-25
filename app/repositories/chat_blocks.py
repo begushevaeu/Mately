@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +19,27 @@ class ChatBlockRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def list_stale_blocks_for_users(
+        self,
+        *,
+        user_ids: list[int],
+        block_key_suffix: str,
+        updated_before: datetime,
+    ) -> list[ChatBlock]:
+        if not user_ids:
+            return []
+
+        result = await self.session.execute(
+            select(ChatBlock)
+            .where(
+                ChatBlock.user_id.in_(user_ids),
+                ChatBlock.block_key.endswith(block_key_suffix),
+                ChatBlock.updated_at < updated_before,
+            )
+            .order_by(ChatBlock.user_id, ChatBlock.chat_id, ChatBlock.block_key)
+        )
+        return list(result.scalars().all())
 
     async def set_message_ids(self, *, user_id: int, chat_id: int, block_key: str, message_ids: list[int]) -> ChatBlock:
         block = await self.get(user_id=user_id, chat_id=chat_id, block_key=block_key)

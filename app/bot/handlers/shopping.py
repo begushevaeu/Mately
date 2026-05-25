@@ -16,9 +16,10 @@ from app.bot.keyboards.shopping import (
     build_shopping_keyboard,
 )
 from app.bot.states.shopping import ShoppingStates
+from app.notifications.delivery import send_user_notification
 from app.services.chat_blocks import SHOPPING_BLOCK_KEY, ChatBlockService
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
-from app.services.shopping import ShoppingService, ShoppingServiceError, build_shopping_panel_text
+from app.services.shopping import ShoppingMutationResult, ShoppingService, ShoppingServiceError, build_shopping_panel_text
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -54,6 +55,13 @@ async def ensure_shopping_access_for_callback(callback: CallbackQuery, session: 
         return None
 
     return result
+
+
+async def send_shopping_notification(bot: Bot, result: ShoppingMutationResult) -> None:
+    if result.notification_user is None or result.notification_text is None:
+        return
+
+    await send_user_notification(bot, result.notification_user, result.notification_text)
 
 
 async def delete_user_message(bot: Bot, message: Message) -> None:
@@ -197,7 +205,7 @@ async def handle_shopping_title(message: Message, state: FSMContext, session: As
     await delete_user_message(bot, message)
     title = (message.text or "").strip()
     try:
-        item = await ShoppingService(session).add_item(result.user, title)
+        mutation_result = await ShoppingService(session).add_item(result.user, title)
     except ShoppingServiceError as error:
         await edit_shopping_panel_from_state(
             bot,
@@ -207,6 +215,8 @@ async def handle_shopping_title(message: Message, state: FSMContext, session: As
         )
         return
 
+    await send_shopping_notification(bot, mutation_result)
+    item = mutation_result.item
     text, keyboard = await build_shopping_panel(session, result.user)
     await edit_shopping_panel_from_state(
         bot,
@@ -218,7 +228,7 @@ async def handle_shopping_title(message: Message, state: FSMContext, session: As
 
 
 @router.callback_query(F.data.startswith("shopping:bought:"))
-async def handle_mark_shopping_bought(callback: CallbackQuery, session: AsyncSession) -> None:
+async def handle_mark_shopping_bought(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
     result = await ensure_shopping_access_for_callback(callback, session)
     if result is None or callback.message is None or callback.data is None:
         return
@@ -230,11 +240,13 @@ async def handle_mark_shopping_bought(callback: CallbackQuery, session: AsyncSes
         return
 
     try:
-        item = await ShoppingService(session).mark_bought(result.user, item_id)
+        mutation_result = await ShoppingService(session).mark_bought(result.user, item_id)
     except ShoppingServiceError as error:
         await callback.answer(str(error), show_alert=True)
         return
 
+    await send_shopping_notification(bot, mutation_result)
+    item = mutation_result.item
     text, keyboard = await build_shopping_panel(session, result.user)
     await edit_shopping_panel(
         callback.message,

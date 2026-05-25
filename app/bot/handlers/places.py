@@ -24,7 +24,14 @@ from app.bot.keyboards.places import (
 from app.bot.states.places import PlaceStates
 from app.services.chat_blocks import PLACES_BLOCK_KEY, ChatBlockService
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
-from app.services.places import PlaceCategory, PlaceListFilter, PlaceService, PlaceServiceError, place_summary_counts
+from app.services.places import (
+    CATEGORY_LABELS,
+    PlaceCategory,
+    PlaceListFilter,
+    PlaceService,
+    PlaceServiceError,
+    place_summary_counts,
+)
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -243,7 +250,7 @@ async def handle_place_category(callback: CallbackQuery, state: FSMContext, sess
     await state.set_state(PlaceStates.waiting_for_title)
     await edit_places_panel(
         callback.message,
-        "📍 <b>Добавить место</b>\n\nНапиши название одним сообщением.",
+        f"📍 <b>Добавить {CATEGORY_LABELS[category]}</b>\n\nНапиши название одним сообщением.",
         build_place_cancel_keyboard(),
     )
     await callback.answer()

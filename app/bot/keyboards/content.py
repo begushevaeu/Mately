@@ -44,9 +44,12 @@ def build_content_category_keyboard(*, mode: str) -> InlineKeyboardMarkup:
         row = []
         for category in categories[index : index + 2]:
             prefix = "content:create:category" if mode == "create" else "content:filter:category"
+            text = CATEGORY_LABELS[category]
+            if mode == "create":
+                text = f"Добавить {text}"
             row.append(
                 InlineKeyboardButton(
-                    text=CATEGORY_LABELS[category],
+                    text=text,
                     callback_data=f"{prefix}:{category.value.lower()}",
                 )
             )

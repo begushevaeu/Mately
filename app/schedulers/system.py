@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramAPIError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -12,12 +13,13 @@ from app.ai.cozy import CozyMessageTheme, append_cozy_suffix
 from app.models import Couple, CoupleReminderSettings, Task, User
 from app.notifications.cats import CatNotificationType
 from app.notifications.delivery import send_user_notification
+from app.repositories.chat_blocks import ChatBlockRepository
 from app.repositories.couples import CoupleRepository
 from app.repositories.notifications import NotificationRepository
 from app.repositories.reminder_settings import ReminderSettingsRepository
-from app.repositories.shopping import ShoppingRepository
 from app.repositories.tasks import TaskRepository
 from app.schedulers.shopping import archive_expired_shopping_items
+from app.services.chat_blocks import BOT_MANAGED_BLOCK_KEY_SUFFIX
 from app.services.tasks import CoupleTaskContext, TaskService
 from app.utils.dates import get_timezone
 
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 MORNING_REMINDER_TIME = time(hour=9, minute=0)
 EVENING_REMINDER_TIME = time(hour=21, minute=0)
 RECAP_TIME = time(hour=10, minute=0)
+MORNING_DIGEST_TASK_LIMIT = 5
 
 
 @dataclass(slots=True)
@@ -151,6 +154,9 @@ async def send_due_couple_notifications_in_session(session: AsyncSession, bot: B
             local_now=now.astimezone(get_timezone(couple.timezone or "Europe/Moscow")),
             now=now,
         )
+        if is_same_local_minute(context.local_now, MORNING_REMINDER_TIME):
+            await cleanup_stale_bot_messages_for_context(session, bot, context)
+
         for notification in await build_due_notifications(session, context):
             scheduled_at = local_schedule_datetime(context.local_now, notification.scheduled_time)
             for member in members:
@@ -168,6 +174,33 @@ async def send_due_couple_notifications_in_session(session: AsyncSession, bot: B
                 sent_count += int(delivered)
 
     return sent_count
+
+
+async def cleanup_stale_bot_messages_for_context(
+    session: AsyncSession,
+    bot: Bot,
+    context: CoupleScheduleContext,
+) -> int:
+    local_day_start = datetime.combine(context.local_now.date(), time.min, tzinfo=context.local_now.tzinfo)
+    updated_before = local_day_start.astimezone(timezone.utc)
+    blocks = ChatBlockRepository(session)
+    stale_blocks = await blocks.list_stale_blocks_for_users(
+        user_ids=context.member_ids,
+        block_key_suffix=BOT_MANAGED_BLOCK_KEY_SUFFIX,
+        updated_before=updated_before,
+    )
+    deleted_count = 0
+    for block in stale_blocks:
+        for message_id in block.message_ids:
+            try:
+                await bot.delete_message(chat_id=block.chat_id, message_id=message_id)
+                deleted_count += 1
+            except TelegramAPIError:
+                logger.debug("Failed to delete stale morning cleanup message", exc_info=True)
+
+        await blocks.clear(user_id=block.user_id, chat_id=block.chat_id, block_key=block.block_key)
+
+    return deleted_count
 
 
 async def build_due_notifications(
@@ -236,18 +269,9 @@ async def build_morning_reminder_text(
     context: CoupleScheduleContext,
 ) -> tuple[str, CatNotificationType | None]:
     tasks = await TaskRepository(session).list_active_for_couple(context.couple.id)
-    shopping_items = await ShoppingRepository(session).list_visible_for_couple(context.couple.id)
-    due_today = tasks_due_on_local_date(tasks, context.local_now)
-    overdue = overdue_tasks(tasks, context.now)
-    active_shopping_count = len([item for item in shopping_items if item.status == "ACTIVE"])
-    cat_type = CatNotificationType.OVERDUE if overdue else CatNotificationType.SLEEPY
-    text = (
-        "Доброе утро. "
-        f"На сегодня: {len(due_today)} задач, в покупках активных пунктов: {active_shopping_count}."
-    )
-    if overdue:
-        text = f"{text} Просроченных задач: {len(overdue)}."
-    return f"{text} Мягко собираем день.", cat_type
+    text = build_morning_task_digest_text(tasks, local_now=context.local_now, now=context.now)
+    cat_type = CatNotificationType.OVERDUE if overdue_tasks(tasks, context.now) else CatNotificationType.RECAP
+    return text, cat_type
 
 
 async def build_evening_reminder_text(
@@ -262,6 +286,47 @@ async def build_evening_reminder_text(
     if overdue:
         text = f"{text} Просроченных: {len(overdue)}."
     return f"{text} Можно закрыть маленький хвостик и выдохнуть.", cat_type
+
+
+def build_morning_task_digest_text(
+    tasks: list[Task],
+    *,
+    local_now: datetime,
+    now: datetime,
+) -> str:
+    unfinished = [task for task in tasks if task.status in {"OPEN", "ASSIGNED", "OVERDUE"}]
+    if not unfinished:
+        return "Доброе утро. Незавершённых задач нет. Пусть день начнётся спокойно."
+
+    overdue = set(overdue_tasks(unfinished, now))
+    due_today = set(tasks_due_on_local_date(unfinished, local_now))
+    lines = ["Доброе утро. Незавершённые задачи:"]
+    for task in unfinished[:MORNING_DIGEST_TASK_LIMIT]:
+        note = morning_task_note(task, overdue=overdue, due_today=due_today)
+        lines.append(f"• {format_morning_task_title(task)}{note}")
+
+    remaining_count = len(unfinished) - MORNING_DIGEST_TASK_LIMIT
+    if remaining_count > 0:
+        lines.append(f"И ещё {remaining_count}.")
+    if overdue:
+        lines.append(f"Просроченных: {len(overdue)}.")
+    lines.append("Хорошего дня, двигаемся мягко.")
+    return "\n".join(lines)
+
+
+def morning_task_note(task: Task, *, overdue: set[Task], due_today: set[Task]) -> str:
+    if task in overdue:
+        return " (просрочена)"
+    if task in due_today:
+        return " (сегодня)"
+    return ""
+
+
+def format_morning_task_title(task: Task) -> str:
+    title = " ".join(task.title.split())
+    if len(title) <= 80:
+        return title
+    return f"{title[:77]}..."
 
 
 def tasks_due_on_local_date(tasks: list[Task], local_now: datetime) -> list[Task]:

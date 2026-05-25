@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Couple, ShoppingItem, User
 from app.repositories.couples import CoupleRepository
+from app.repositories.partner_aliases import PartnerAliasRepository
 from app.repositories.shopping import ShoppingRepository
+from app.services.partner_aliases import DisplayName, PartnerAliasService
 from app.utils.dates import get_timezone
 
 
@@ -26,6 +28,17 @@ class ShoppingContext:
     def member_ids(self) -> list[int]:
         return [member.id for member in self.members]
 
+    @property
+    def partner(self) -> User | None:
+        return next((member for member in self.members if member.id != self.current_user.id), None)
+
+
+@dataclass(slots=True)
+class ShoppingMutationResult:
+    item: ShoppingItem
+    notification_user: User | None = None
+    notification_text: str | None = None
+
 
 class ShoppingService:
     def __init__(
@@ -33,12 +46,14 @@ class ShoppingService:
         session: AsyncSession | None = None,
         couples: CoupleRepository | None = None,
         shopping: ShoppingRepository | None = None,
+        aliases: PartnerAliasRepository | None = None,
     ) -> None:
         if session is None and (couples is None or shopping is None):
             raise ValueError("session is required when repositories are not provided")
 
         self.couples = couples or CoupleRepository(session)  # type: ignore[arg-type]
         self.shopping = shopping or ShoppingRepository(session)  # type: ignore[arg-type]
+        self.aliases = PartnerAliasService(session=session, aliases=aliases)  # type: ignore[arg-type]
 
     async def get_context(self, current_user: User) -> ShoppingContext:
         membership = await self.couples.get_membership(current_user.id)
@@ -56,7 +71,7 @@ class ShoppingService:
         await self.archive_expired_bought_items_for_context(context)
         return context, await self.shopping.list_visible_for_couple(context.couple.id)
 
-    async def add_item(self, current_user: User, title: str) -> ShoppingItem:
+    async def add_item(self, current_user: User, title: str) -> ShoppingMutationResult:
         title = title.strip()
         if not title:
             raise ShoppingServiceError("Название покупки не должно быть пустым")
@@ -64,9 +79,16 @@ class ShoppingService:
             raise ShoppingServiceError("Название покупки получилось слишком длинным")
 
         context = await self.get_context(current_user)
-        return await self.shopping.create(couple_id=context.couple.id, title=title, added_by=current_user.id)
+        item = await self.shopping.create(couple_id=context.couple.id, title=title, added_by=current_user.id)
+        partner = context.partner
+        actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
+        return ShoppingMutationResult(
+            item=item,
+            notification_user=partner,
+            notification_text=f"{actor_label.nominative_with_emoji} добавил(а) в покупки «{item.title}».",
+        )
 
-    async def mark_bought(self, current_user: User, item_id: int) -> ShoppingItem:
+    async def mark_bought(self, current_user: User, item_id: int) -> ShoppingMutationResult:
         context = await self.get_context(current_user)
         await self.archive_expired_bought_items_for_context(context)
         item = await self._get_scoped_item(context, item_id)
@@ -75,10 +97,17 @@ class ShoppingService:
         if item.status == "BOUGHT":
             raise ShoppingServiceError("Эта покупка уже отмечена купленной")
 
-        return await self.shopping.mark_bought(
+        item = await self.shopping.mark_bought(
             item,
             completed_by=current_user.id,
             completed_at=datetime.now(timezone.utc),
+        )
+        partner = context.partner
+        actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
+        return ShoppingMutationResult(
+            item=item,
+            notification_user=partner,
+            notification_text=f"{actor_label.nominative_with_emoji} отметил(а) купленным «{item.title}».",
         )
 
     async def archive_expired_bought_items_for_context(
@@ -100,11 +129,13 @@ class ShoppingService:
         if item is None:
             raise ShoppingServiceError("Покупка не найдена")
 
-        belongs_to_couple = True
-        if not belongs_to_couple:
-            raise ShoppingServiceError("Покупка не найдена")
-
         return item
+
+    async def _display_for_partner_or_fallback(self, *, owner: User | None, partner: User) -> DisplayName:
+        if owner is None:
+            return DisplayName(emoji="", nominative="Партнёр", genitive="партнёра", dative="партнёру")
+
+        return await self.aliases.get_display_for(owner=owner, partner=partner)
 
 
 def start_of_today_utc(timezone_name: str, now: datetime) -> datetime:

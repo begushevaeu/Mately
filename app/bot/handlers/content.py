@@ -38,6 +38,7 @@ from app.bot.states.content import ContentStates
 from app.notifications.cats import select_cat_asset
 from app.services.chat_blocks import CONTENT_BLOCK_KEY, ChatBlockService
 from app.services.content import (
+    CATEGORY_LABELS,
     CONTENT_REACTIONS,
     ContentCategory,
     ContentListFilter,
@@ -320,7 +321,7 @@ async def handle_content_category(callback: CallbackQuery, state: FSMContext, se
     await state.set_state(ContentStates.waiting_for_title)
     await edit_content_panel(
         callback.message,
-        "🎬 <b>Добавить контент</b>\n\nНапиши название одним сообщением.",
+        f"🎬 <b>Добавить {CATEGORY_LABELS[category]}</b>\n\nНапиши название одним сообщением.",
         build_content_cancel_keyboard(),
     )
     await callback.answer()

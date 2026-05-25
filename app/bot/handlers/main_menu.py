@@ -291,7 +291,11 @@ async def handle_additional_statistics(callback: CallbackQuery, session: AsyncSe
         return
 
     text = await build_statistics_panel_text(session, result, period="week")
-    await callback.message.edit_text(text, reply_markup=build_statistics_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(
+        text,
+        reply_markup=build_statistics_keyboard(current_period="week"),
+        parse_mode="HTML",
+    )
     await callback.answer()
 
 
@@ -308,7 +312,11 @@ async def handle_statistics_period(callback: CallbackQuery, session: AsyncSessio
 
     period = "month" if callback.data == STATISTICS_MONTH_CALLBACK else "week"
     text = await build_statistics_panel_text(session, result, period=period)
-    await callback.message.edit_text(text, reply_markup=build_statistics_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(
+        text,
+        reply_markup=build_statistics_keyboard(current_period=period),
+        parse_mode="HTML",
+    )
     await callback.answer()
 
 

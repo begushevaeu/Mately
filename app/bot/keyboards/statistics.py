@@ -8,14 +8,17 @@ STATISTICS_WEEK_CALLBACK = "statistics:week"
 STATISTICS_MONTH_CALLBACK = "statistics:month"
 
 
-def build_statistics_keyboard() -> InlineKeyboardMarkup:
+def build_statistics_keyboard(*, current_period: str = "week") -> InlineKeyboardMarkup:
+    period_buttons = []
+    if current_period != "week":
+        period_buttons.append(InlineKeyboardButton(text="Неделя", callback_data=STATISTICS_WEEK_CALLBACK))
+    if current_period != "month":
+        period_buttons.append(InlineKeyboardButton(text="Месяц", callback_data=STATISTICS_MONTH_CALLBACK))
+
     return with_close_button(
         InlineKeyboardMarkup(
             inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="Неделя", callback_data=STATISTICS_WEEK_CALLBACK),
-                    InlineKeyboardButton(text="Месяц", callback_data=STATISTICS_MONTH_CALLBACK),
-                ],
+                period_buttons,
                 [build_back_to_additional_button()],
             ]
         ),

@@ -38,7 +38,7 @@ def build_place_category_keyboard() -> InlineKeyboardMarkup:
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=CATEGORY_LABELS[category],
+                    text=f"Добавить {CATEGORY_LABELS[category]}",
                     callback_data=f"places:create:category:{category.value.lower()}",
                 )
                 for category in categories[index : index + 2]
