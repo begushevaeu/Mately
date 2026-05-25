@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.bot.handlers.places import edit_places_panel, edit_places_panel_from_state, remember_places_panel_in_state
+from app.bot.handlers.places import (
+    edit_places_panel,
+    edit_places_panel_from_state,
+    remember_places_panel_in_state,
+    render_places_list_panel,
+)
 
 
 class FakeChat:
@@ -79,3 +84,24 @@ async def test_places_panel_from_state_edits_caption_for_remembered_photo_notifi
         "reply_markup": "keyboard",
         "parse_mode": "HTML",
     }
+
+
+@pytest.mark.asyncio
+async def test_places_list_panel_renders_index_inside_quote() -> None:
+    class FakePlaceService:
+        async def build_place_card(self, _context, _item, *, list_index: int | None = None) -> str:
+            return f"<blockquote>{list_index}. Sage</blockquote>\nКатегория: 🍽️ Ресторан"
+
+    panel = await render_places_list_panel(
+        FakePlaceService(),
+        context=object(),
+        items=[object()],
+        title="В планах",
+        empty_text="Пока пусто.",
+    )
+
+    assert panel == (
+        "📍 <b>В планах</b>\n\n"
+        "<blockquote>1. Sage</blockquote>\n"
+        "Категория: 🍽️ Ресторан"
+    )

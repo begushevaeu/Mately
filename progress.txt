@@ -619,3 +619,35 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-125 - Allow deleting completed-task notifications
+
+2026-05-26 00:57 +03:00 MAT-129 Claim
+------------------------------------
+Task: MAT-129 - Render content and place titles as Quote.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 1 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 01:00 +03:00 MAT-129 Done
+-----------------------------------
+Task: MAT-129 - Render content and place titles as Quote.
+
+Done:
+- Content and place titles now use Telegram quote formatting instead of spoilers, with list numbers included inside quoted title blocks and metadata left outside.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-125 - Allow deleting completed-task notifications

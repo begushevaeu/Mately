@@ -35,7 +35,7 @@ from app.services.places import (
     PlaceMutationResult,
     PlaceService,
     PlaceServiceError,
-    format_place_title_spoiler,
+    format_place_title_quote,
     place_summary_counts,
 )
 
@@ -186,7 +186,7 @@ async def render_places_list_panel(
 
     blocks = [f"📍 <b>{title}</b>"]
     for index, item in enumerate(items, start=1):
-        blocks.append(f"{index}. {await service.build_place_card(context, item)}")
+        blocks.append(await service.build_place_card(context, item, list_index=index))
 
     return "\n\n".join(blocks)
 
@@ -328,7 +328,7 @@ async def handle_place_title(message: Message, state: FSMContext, session: Async
     await edit_places_panel_from_state(
         bot,
         state,
-        f"✅ <b>Добавлено:</b> {format_place_title_spoiler(item)}\n\n{text}",
+        f"✅ <b>Добавлено</b>\n\n{format_place_title_quote(item)}\n\n{text}",
         keyboard,
     )
     await state.clear()
@@ -373,7 +373,7 @@ async def handle_visit_place(callback: CallbackQuery, state: FSMContext, session
     await state.set_state(PlaceStates.choosing_rating)
     await edit_places_panel(
         callback.message,
-        f"✅ <b>Посетили:</b> {format_place_title_spoiler(item)}\n\nПоставь оценку от 1 до 10.",
+        f"✅ <b>Посетили</b>\n\n{format_place_title_quote(item)}\n\nПоставь оценку от 1 до 10.",
         build_place_rating_keyboard(item.id),
     )
     await callback.answer()

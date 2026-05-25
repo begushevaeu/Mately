@@ -91,8 +91,9 @@ NOT_ACQUAINTED_RESPONSE = "NOT_ACQUAINTED"
 RATED_RESPONSE = "RATED"
 
 
-def format_place_title_spoiler(item: PlaceItem) -> str:
-    return f"<tg-spoiler>{escape(item.title)}</tg-spoiler>"
+def format_place_title_quote(item: PlaceItem, *, prefix: str | None = None) -> str:
+    prefix_text = f"{escape(prefix)} " if prefix else ""
+    return f"<blockquote>{prefix_text}{escape(item.title)}</blockquote>"
 
 
 class PlaceService:
@@ -162,8 +163,8 @@ class PlaceService:
             item=item,
             notification_user=partner,
             notification_text=(
-                f"{escape(actor_label.nominative_with_emoji)} отметил(а) {format_place_title_spoiler(item)} "
-                "как посещённое. "
+                f"{escape(actor_label.nominative_with_emoji)} отметил(а) место как посещённое.\n\n"
+                f"{format_place_title_quote(item)}\n\n"
                 "Поставь оценку или нажми «Не был(а)»."
             ),
             cozy_theme=CozyMessageTheme.PLACE_VISITED,
@@ -199,10 +200,18 @@ class PlaceService:
 
         return await self.places.add_comment(place_id=item.id, user_id=current_user.id, text=text)
 
-    async def build_place_card(self, context: PlaceContext, item: PlaceItem) -> str:
+    async def build_place_card(
+        self,
+        context: PlaceContext,
+        item: PlaceItem,
+        *,
+        list_index: int | None = None,
+    ) -> str:
         owner_label = await self._actor_line(context, item.added_by)
+        quote_prefix = f"{list_index}." if list_index is not None else None
         lines = [
-            f"{category_label(item.category)} {format_place_title_spoiler(item)}",
+            format_place_title_quote(item, prefix=quote_prefix),
+            f"Категория: {category_label(item.category)}",
             f"Статус: {status_label(item)}",
             f"Добавил(а): {owner_label}",
             f"Средняя оценка: {format_average_rating(item)}",

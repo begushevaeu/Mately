@@ -130,7 +130,7 @@ async def test_place_not_acquainted_handler_saves_without_score(monkeypatch: pyt
 
 
 @pytest.mark.asyncio
-async def test_content_completion_notification_uses_spoiler_markup_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_content_completion_notification_uses_quote_markup_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
     user = User(id=2, telegram_id=200, username=None, first_name="Two")
     result = ContentMutationResult(
         item=ContentItem(id=42, title="Movie", category="MOVIE", added_by=1, status="COMPLETED"),

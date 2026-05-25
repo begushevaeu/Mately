@@ -48,7 +48,7 @@ from app.services.content import (
     ContentServiceError,
     completed_since_for_period,
     content_summary_counts,
-    format_content_title_spoiler,
+    format_content_title_quote,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 
@@ -215,7 +215,7 @@ async def render_content_list_panel(
 
     blocks = [f"🎬 <b>{title}</b>"]
     for index, item in enumerate(items, start=1):
-        blocks.append(f"{index}. {await service.build_content_card(context, item)}")
+        blocks.append(await service.build_content_card(context, item, list_index=index))
 
     return "\n\n".join(blocks)
 
@@ -357,7 +357,7 @@ async def handle_content_title(message: Message, state: FSMContext, session: Asy
     await edit_content_panel_from_state(
         bot,
         state,
-        f"✅ <b>Добавлено:</b> {format_content_title_spoiler(item)}\n\n{text}",
+        f"✅ <b>Добавлено</b>\n\n{format_content_title_quote(item)}\n\n{text}",
         keyboard,
     )
     await state.clear()
@@ -505,7 +505,7 @@ async def handle_complete_content(callback: CallbackQuery, state: FSMContext, se
     await state.set_state(ContentStates.choosing_rating)
     await edit_content_panel(
         callback.message,
-        f"✅ <b>Завершено:</b> {format_content_title_spoiler(mutation_result.item)}\n\n"
+        f"✅ <b>Завершено</b>\n\n{format_content_title_quote(mutation_result.item)}\n\n"
         "Поставь оценку от 1 до 10.",
         build_content_rating_keyboard(mutation_result.item.id),
     )

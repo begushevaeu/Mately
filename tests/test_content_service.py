@@ -173,7 +173,9 @@ async def test_content_can_be_added_completed_and_rated() -> None:
     assert completed.notification_user is creator
     assert (
         completed.notification_text
-        == "Two отметил(а) <tg-spoiler>Интерстеллар</tg-spoiler> как завершённое. Хочешь поставить оценку?"
+        == "Two отметил(а) контент как завершённое.\n\n"
+        "<blockquote>Интерстеллар</blockquote>\n\n"
+        "Хочешь поставить оценку?"
     )
     assert completed.cat_notification_type is CatNotificationType.COMPLETED
     assert rating.score == 10
@@ -196,7 +198,7 @@ async def test_content_not_acquainted_response_skips_numeric_rating_and_average(
     assert response.score is None
     assert response.emoji is None
     assert average_rating(items[0]) is None
-    assert "🎬 Фильм <tg-spoiler>Интерстеллар</tg-spoiler>" in card
+    assert card.startswith("<blockquote>Интерстеллар</blockquote>\nКатегория: 🎬 Фильм")
     assert "Не знаком(а): Two" in card
 
 

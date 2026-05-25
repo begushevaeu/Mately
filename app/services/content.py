@@ -99,8 +99,9 @@ NOT_ACQUAINTED_RESPONSE = "NOT_ACQUAINTED"
 RATED_RESPONSE = "RATED"
 
 
-def format_content_title_spoiler(item: ContentItem) -> str:
-    return f"<tg-spoiler>{escape(item.title)}</tg-spoiler>"
+def format_content_title_quote(item: ContentItem, *, prefix: str | None = None) -> str:
+    prefix_text = f"{escape(prefix)} " if prefix else ""
+    return f"<blockquote>{prefix_text}{escape(item.title)}</blockquote>"
 
 
 class ContentService:
@@ -166,8 +167,8 @@ class ContentService:
             item=item,
             notification_user=partner,
             notification_text=(
-                f"{escape(actor_label.nominative_with_emoji)} отметил(а) {format_content_title_spoiler(item)} "
-                "как завершённое. "
+                f"{escape(actor_label.nominative_with_emoji)} отметил(а) контент как завершённое.\n\n"
+                f"{format_content_title_quote(item)}\n\n"
                 "Хочешь поставить оценку?"
             ),
             cozy_theme=CozyMessageTheme.CONTENT_COMPLETED,
@@ -212,10 +213,18 @@ class ContentService:
         item = await self._get_scoped_item(context, content_id)
         return await self.content.add_comment(content_id=item.id, user_id=current_user.id, text=text)
 
-    async def build_content_card(self, context: ContentContext, item: ContentItem) -> str:
+    async def build_content_card(
+        self,
+        context: ContentContext,
+        item: ContentItem,
+        *,
+        list_index: int | None = None,
+    ) -> str:
         owner_label = await self._actor_line(context, item.added_by)
+        quote_prefix = f"{list_index}." if list_index is not None else None
         lines = [
-            f"{category_label(item.category)} {format_content_title_spoiler(item)}",
+            format_content_title_quote(item, prefix=quote_prefix),
+            f"Категория: {category_label(item.category)}",
             f"Статус: {status_label(item)}",
             f"Добавил(а): {owner_label}",
             f"Средняя оценка: {format_average_rating(item)}",

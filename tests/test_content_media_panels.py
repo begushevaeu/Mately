@@ -6,6 +6,7 @@ from app.bot.handlers.content import (
     edit_content_panel,
     edit_content_panel_from_state,
     remember_content_panel_in_state,
+    render_content_list_panel,
 )
 
 
@@ -83,3 +84,24 @@ async def test_content_panel_from_state_edits_caption_for_remembered_photo_notif
         "reply_markup": "keyboard",
         "parse_mode": "HTML",
     }
+
+
+@pytest.mark.asyncio
+async def test_content_list_panel_renders_index_inside_quote() -> None:
+    class FakeContentService:
+        async def build_content_card(self, _context, _item, *, list_index: int | None = None) -> str:
+            return f"<blockquote>{list_index}. Интерстеллар</blockquote>\nКатегория: 🎬 Фильм"
+
+    panel = await render_content_list_panel(
+        FakeContentService(),
+        context=object(),
+        items=[object()],
+        title="В планах",
+        empty_text="Пока пусто.",
+    )
+
+    assert panel == (
+        "🎬 <b>В планах</b>\n\n"
+        "<blockquote>1. Интерстеллар</blockquote>\n"
+        "Категория: 🎬 Фильм"
+    )

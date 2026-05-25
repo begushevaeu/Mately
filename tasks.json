@@ -1130,6 +1130,35 @@
       "notes": "Added from user testing feedback on 2026-05-26."
     },
     {
+      "id": "MAT-129",
+      "title": "Render content and place titles as Quote",
+      "description": "Replace Telegram spoiler formatting for content and place titles with quote formatting, including list numbers inside the quote.",
+      "status": "done",
+      "priority": "P1",
+      "category": "content-places-ux",
+      "dependencies": [
+        "MAT-124"
+      ],
+      "scope": [
+        "Replace content title spoilers with Telegram quotes",
+        "Replace place title spoilers with Telegram quotes",
+        "Put visible list numbers inside quotes for content and place lists",
+        "Keep categories, statuses, ratings, and comments readable outside quotes",
+        "Escape user-entered titles safely"
+      ],
+      "acceptance_criteria": [
+        "Content titles appear as quotes instead of spoilers",
+        "Place titles appear as quotes instead of spoilers",
+        "Content and place list numbers are inside the quote block",
+        "Callbacks, media captions, and list navigation still work"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_service.py tests/test_content_keyboards.py tests/test_content_media_panels.py tests/test_places_service.py tests/test_places_keyboards.py tests/test_places_media_panels.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-26."
+    },
+    {
       "id": "MAT-126",
       "title": "Connect production-grade AI messaging",
       "description": "Replace the visible placeholder-like AI behavior with a properly configured, natural AI message layer for the bot's cozy notifications and summaries.",

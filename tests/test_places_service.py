@@ -181,7 +181,8 @@ async def test_place_can_be_added_visited_rated_and_commented() -> None:
     assert visited_result.notification_user is creator
     assert (
         visited_result.notification_text
-        == "Two отметил(а) <tg-spoiler>Sage &lt;3</tg-spoiler> как посещённое. "
+        == "Two отметил(а) место как посещённое.\n\n"
+        "<blockquote>Sage &lt;3</blockquote>\n\n"
         "Поставь оценку или нажми «Не был(а)»."
     )
     assert visited_result.cozy_theme is CozyMessageTheme.PLACE_VISITED
@@ -189,7 +190,7 @@ async def test_place_can_be_added_visited_rated_and_commented() -> None:
     assert rating.score == 9
     assert comment.text == "Очень вкусно"
     assert average_rating(items[0]) == 9
-    assert "🍽️ Ресторан <tg-spoiler>Sage &lt;3</tg-spoiler>" in card
+    assert card.startswith("<blockquote>Sage &lt;3</blockquote>\nКатегория: 🍽️ Ресторан")
     assert "Комментарии:" in card
 
 
@@ -241,7 +242,8 @@ async def test_partner_aliases_are_used_in_place_visit_notifications() -> None:
     assert result.notification_user is creator
     assert (
         result.notification_text
-        == "🥒Огурчик отметил(а) <tg-spoiler>Парк</tg-spoiler> как посещённое. "
+        == "🥒Огурчик отметил(а) место как посещённое.\n\n"
+        "<blockquote>Парк</blockquote>\n\n"
         "Поставь оценку или нажми «Не был(а)»."
     )
 
