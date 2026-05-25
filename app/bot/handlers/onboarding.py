@@ -1,4 +1,6 @@
-from aiogram import Bot, F, Router
+from html import escape
+
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -15,7 +17,7 @@ from app.bot.keyboards.onboarding import (
     build_waiting_for_partner_menu,
 )
 from app.bot.states.onboarding import JoinCoupleStates
-from app.bot.handlers.partner_aliases import maybe_prompt_partner_alias
+from app.bot.handlers.partner_aliases import maybe_prompt_couple_creator_for_joined_partner, maybe_prompt_partner_alias
 from app.services.chat_blocks import (
     MAIN_MENU_BLOCK_KEYS,
     ONBOARDING_BLOCK_KEY,
@@ -50,9 +52,10 @@ async def answer_for_onboarding_state(message: Message, result: OnboardingResult
     if result.status is OnboardingStatus.WAITING_FOR_PARTNER:
         await message.answer(
             "Пара создана. Отправь партнеру этот код:\n\n"
-            f"{result.invite_code}\n\n"
+            f"<b>{escape(result.invite_code or '')}</b>\n\n"
             "Когда партнер введет код у себя в боте, ваше пространство станет общим.",
             reply_markup=build_waiting_for_partner_menu(),
+            parse_mode="HTML",
         )
         return
 
@@ -185,7 +188,13 @@ async def handle_refresh_status(message: Message, session: AsyncSession) -> None
 
 
 @router.message(JoinCoupleStates.waiting_for_invite_code)
-async def handle_invite_code(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
+async def handle_invite_code(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
+    dispatcher: Dispatcher,
+) -> None:
     result = await get_current_onboarding_result(message, session)
     if result is None:
         return
@@ -203,3 +212,10 @@ async def handle_invite_code(message: Message, state: FSMContext, session: Async
         await reset_onboarding_block(session=session, bot=bot, result=result, chat_id=message.chat.id)
     await answer_for_onboarding_state(message, joined_result)
     await maybe_prompt_partner_alias(message, joined_result, session, state, bot)
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        await maybe_prompt_couple_creator_for_joined_partner(
+            bot=bot,
+            dispatcher=dispatcher,
+            session=session,
+            result=joined_result,
+        )

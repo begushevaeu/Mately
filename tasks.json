@@ -1,0 +1,1252 @@
+{
+  "project": {
+    "name": "Mately",
+    "task_source": "tasks.json",
+    "created_at": "2026-05-22T16:52:15.021904+03:00",
+    "roadmap_updated_at": "2026-05-25"
+  },
+  "agent_instructions": {
+    "before_start": [
+      "Use tasks.json as the source of truth for task status and dependency selection.",
+      "Use taskos claim before implementation to atomically claim one dependency-ready task.",
+      "Read ROADMAP.md and the relevant canonical docs when choosing product direction.",
+      "Implement only the selected task."
+    ],
+    "before_finish": [
+      "Run focused checks for the changed area.",
+      "Use taskos done/block/release to update task status and progress.",
+      "Do not manually edit generated task views."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "MAT-001",
+      "title": "Establish Python bot foundation",
+      "description": "Create the aiogram/SQLAlchemy project skeleton, local runtime files, configuration layer, and application entry point.",
+      "status": "done",
+      "priority": "P0",
+      "category": "foundation",
+      "dependencies": [],
+      "scope": [
+        "Python 3.12 package and editable install",
+        "aiogram application entry point",
+        "settings, logging, database session middleware",
+        "Docker Compose and local PostgreSQL scaffolding"
+      ],
+      "acceptance_criteria": [
+        "The bot can be started with python -m app.main after env setup",
+        "Runtime configuration comes from environment variables",
+        "Handlers receive a managed async database session"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_project_bootstrap.py tests/test_deployment_config.py"
+      ],
+      "notes": "Implemented before TaskOS adoption."
+    },
+    {
+      "id": "MAT-002",
+      "title": "Build core database schema and migrations",
+      "description": "Define the MVP data model and Alembic migrations for users, couples, tasks, shopping, content, notifications, aliases, chat blocks, and places.",
+      "status": "done",
+      "priority": "P0",
+      "category": "data",
+      "dependencies": [
+        "MAT-001"
+      ],
+      "scope": [
+        "SQLAlchemy models under app/models",
+        "Alembic migrations 0001 through 0005",
+        "Core uniqueness and check constraints",
+        "Explicit foreign key delete behavior"
+      ],
+      "acceptance_criteria": [
+        "All core tables are registered",
+        "MVP shared entities remain scoped through ownership and couple membership",
+        "Migrations support local and container startup"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_database_models.py tests/test_deployment_config.py"
+      ],
+      "notes": "Direct couple_id fields are intentionally deferred for a later scale migration."
+    },
+    {
+      "id": "MAT-003",
+      "title": "Implement couple onboarding and invite codes",
+      "description": "Allow users to create or join a two-person couple space with readable invite codes and safe onboarding states.",
+      "status": "done",
+      "priority": "P0",
+      "category": "onboarding",
+      "dependencies": [
+        "MAT-002"
+      ],
+      "scope": [
+        "User profile normalization",
+        "Invite code creation and validation",
+        "Expired, invalid, full, and already-in-couple cases",
+        "Onboarding FSM and safe cancellation"
+      ],
+      "acceptance_criteria": [
+        "A user can create a couple and a partner can join",
+        "Invalid or expired invite codes are handled softly",
+        "A user cannot join multiple couples"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_couple_service.py tests/test_onboarding_handlers.py"
+      ],
+      "notes": "Current MVP is optimized for one real couple while keeping multi-couple architecture possible."
+    },
+    {
+      "id": "MAT-004",
+      "title": "Implement Telegram main menu and recovery flows",
+      "description": "Provide compact Telegram-native navigation, recoverable screens, and smart cleanup of old bot blocks.",
+      "status": "done",
+      "priority": "P0",
+      "category": "telegram-ux",
+      "dependencies": [
+        "MAT-003"
+      ],
+      "scope": [
+        "Main menu sections",
+        "Reply and inline keyboards",
+        "Current chat block tracking",
+        "/start, /menu, and /cancel recovery",
+        "Unknown message cleanup"
+      ],
+      "acceptance_criteria": [
+        "Users without a couple are blocked from protected menus",
+        "Users in a couple can always return to a safe menu",
+        "Old screens are closed or cleaned up predictably"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_main_menu_handlers.py tests/test_error_handling.py tests/test_additional_keyboards.py"
+      ],
+      "notes": "The UX should stay compact and non-corporate."
+    },
+    {
+      "id": "MAT-005",
+      "title": "Add partner display names",
+      "description": "Let each user define a gentle display name for their partner and use those names in cards and notifications.",
+      "status": "done",
+      "priority": "P1",
+      "category": "personalization",
+      "dependencies": [
+        "MAT-003",
+        "MAT-004"
+      ],
+      "scope": [
+        "Partner alias model and repository",
+        "Alias normalization and fallback display names",
+        "Alias prompts after onboarding",
+        "Alias usage in task cards and notifications"
+      ],
+      "acceptance_criteria": [
+        "Aliases are trimmed and length-limited",
+        "Fallback names work when an alias is missing",
+        "Task notifications and cards show partner-friendly names"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_task_service.py tests/test_onboarding_handlers.py"
+      ],
+      "notes": "Implemented in migration 0002 and partner alias service."
+    },
+    {
+      "id": "MAT-006",
+      "title": "Implement household tasks and recurrence",
+      "description": "Support shared household tasks, assignments, a task pool, completion, archiving, and recurring task regeneration.",
+      "status": "done",
+      "priority": "P0",
+      "category": "tasks",
+      "dependencies": [
+        "MAT-002",
+        "MAT-003",
+        "MAT-004",
+        "MAT-005"
+      ],
+      "scope": [
+        "Task creation and assignment to self, partner, or pool",
+        "Task claiming and completion",
+        "One-time task archival",
+        "Daily, weekly, monthly, and custom recurrence",
+        "Task history and recurrence dedupe"
+      ],
+      "acceptance_criteria": [
+        "Partner-assigned tasks notify the partner",
+        "Pool tasks can be claimed and completed",
+        "Recurring tasks create exactly one next occurrence",
+        "Tasks from another couple are not exposed"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_task_service.py tests/test_task_keyboards.py tests/test_task_block_handlers.py"
+      ],
+      "notes": "Custom recurrence interval support is included."
+    },
+    {
+      "id": "MAT-007",
+      "title": "Implement shared shopping list",
+      "description": "Support a calm shared shopping list where active and bought items are visible until local midnight cleanup.",
+      "status": "done",
+      "priority": "P1",
+      "category": "shopping",
+      "dependencies": [
+        "MAT-002",
+        "MAT-003",
+        "MAT-004",
+        "MAT-005"
+      ],
+      "scope": [
+        "Shopping item creation",
+        "Marking items bought",
+        "Active-first shopping panel",
+        "Local-midnight archival scheduler",
+        "Escaped item display"
+      ],
+      "acceptance_criteria": [
+        "Items can be added and marked bought",
+        "Bought items are archived after the couple's local midnight",
+        "The panel keeps active items first"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_shopping_service.py tests/test_shopping_keyboards.py"
+      ],
+      "notes": "Partner notifications are intentionally deferred."
+    },
+    {
+      "id": "MAT-008",
+      "title": "Implement content tracker",
+      "description": "Track shared movies, series, books, games, and other content with completion, ratings, reactions, comments, and filters.",
+      "status": "done",
+      "priority": "P1",
+      "category": "content",
+      "dependencies": [
+        "MAT-002",
+        "MAT-003",
+        "MAT-004",
+        "MAT-005"
+      ],
+      "scope": [
+        "Content item creation",
+        "Completion flow",
+        "Per-user ratings and reactions",
+        "Chronological comments",
+        "Status, category, rating, and date filters",
+        "Photo/caption panel handling"
+      ],
+      "acceptance_criteria": [
+        "Content can be added, completed, rated, and commented",
+        "Both partners can comment",
+        "Filters respect status, category, rating, and couple timezone"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_service.py tests/test_content_keyboards.py tests/test_content_media_panels.py"
+      ],
+      "notes": "Current content feature is stronger than the original bare MVP."
+    },
+    {
+      "id": "MAT-009",
+      "title": "Implement places tracker",
+      "description": "Track places the couple wants to visit, mark them visited, and store ratings and comments.",
+      "status": "done",
+      "priority": "P1",
+      "category": "places",
+      "dependencies": [
+        "MAT-002",
+        "MAT-003",
+        "MAT-004",
+        "MAT-005"
+      ],
+      "scope": [
+        "Place item creation",
+        "Planned and visited lists",
+        "Visit flow",
+        "Ratings and comments after visit",
+        "Category labels and summary counts"
+      ],
+      "acceptance_criteria": [
+        "Places can be added, visited, rated, and commented",
+        "Rating and comments require a visited place",
+        "Lists separate planned and visited places"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py"
+      ],
+      "notes": "Filters and partner notifications are deferred."
+    },
+    {
+      "id": "MAT-010",
+      "title": "Implement statistics and recaps",
+      "description": "Provide weekly and monthly summaries that cover completed tasks, content, ratings, overdue work, and cozy recap copy.",
+      "status": "done",
+      "priority": "P1",
+      "category": "analytics",
+      "dependencies": [
+        "MAT-006",
+        "MAT-008"
+      ],
+      "scope": [
+        "Weekly recap period",
+        "Monthly recap period",
+        "Completed task counts",
+        "Content and rating summaries",
+        "Overdue task signal",
+        "Cozy summary text"
+      ],
+      "acceptance_criteria": [
+        "Weekly and monthly periods use the couple timezone",
+        "Monthly recap handles the first day of a month correctly",
+        "Recap text remains compact and warm"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_analytics_recaps.py"
+      ],
+      "notes": "Shopping and places are not deeply represented yet."
+    },
+    {
+      "id": "MAT-011",
+      "title": "Implement scheduler and reminders",
+      "description": "Run background jobs for recurring task regeneration, shopping cleanup, and scheduled couple notifications with dedupe keys.",
+      "status": "done",
+      "priority": "P0",
+      "category": "scheduling",
+      "dependencies": [
+        "MAT-006",
+        "MAT-007",
+        "MAT-010"
+      ],
+      "scope": [
+        "APScheduler startup",
+        "Recurring task regeneration",
+        "Morning and evening reminders",
+        "Weekly and monthly recap notifications",
+        "Notification dedupe keys",
+        "Local schedule conversion to UTC"
+      ],
+      "acceptance_criteria": [
+        "Due recurring tasks regenerate once",
+        "Scheduled notifications are sent once per local period",
+        "Reminder timing uses the couple timezone"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_scheduler_system.py tests/test_task_service.py"
+      ],
+      "notes": "APScheduler is enough for the MVP; Redis/Celery is deferred."
+    },
+    {
+      "id": "MAT-012",
+      "title": "Add cozy AI suffixes and local cat assets",
+      "description": "Make notifications warmer through optional OpenAI suffixes and local cat images, while retaining deterministic fallbacks.",
+      "status": "done",
+      "priority": "P2",
+      "category": "cozy-layer",
+      "dependencies": [
+        "MAT-011"
+      ],
+      "scope": [
+        "OpenAI-backed cozy message generator",
+        "Fallback cozy messages without API key",
+        "Response sanitization and length limits",
+        "Local cat mood folders",
+        "Photo delivery with text fallback"
+      ],
+      "acceptance_criteria": [
+        "Missing OPENAI_API_KEY does not break notifications",
+        "Generated suffixes are short and sanitized",
+        "Missing cat assets fall back to plain text"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_cozy_ai.py tests/test_cat_assets.py tests/test_cat_notification_delivery.py"
+      ],
+      "notes": "The cozy layer should stay subtle."
+    },
+    {
+      "id": "MAT-013",
+      "title": "Prepare local deployment scaffolding",
+      "description": "Make the MVP runnable locally through Docker Compose and ready for single-process polling deployment.",
+      "status": "done",
+      "priority": "P0",
+      "category": "deployment",
+      "dependencies": [
+        "MAT-001",
+        "MAT-002"
+      ],
+      "scope": [
+        "Dockerfile",
+        "Docker Compose database service",
+        "Database health checks",
+        "Entrypoint migration execution",
+        "README deployment notes"
+      ],
+      "acceptance_criteria": [
+        "Docker Compose waits for database health",
+        "Entrypoint applies migrations before starting the bot",
+        "README documents local and MVP deployment notes"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_deployment_config.py"
+      ],
+      "notes": "Full production finalization remains pending."
+    },
+    {
+      "id": "MAT-014",
+      "title": "Establish tests and architecture guardrails",
+      "description": "Cover the implemented MVP behavior with focused tests and protect the handlers-services-repositories boundary.",
+      "status": "done",
+      "priority": "P0",
+      "category": "quality",
+      "dependencies": [
+        "MAT-004",
+        "MAT-006",
+        "MAT-007",
+        "MAT-008",
+        "MAT-009",
+        "MAT-010",
+        "MAT-011",
+        "MAT-012",
+        "MAT-013"
+      ],
+      "scope": [
+        "Service-level tests",
+        "Keyboard and handler tests",
+        "Scheduler and notification tests",
+        "Database model tests",
+        "Architecture import guardrail"
+      ],
+      "acceptance_criteria": [
+        "The full test suite passes",
+        "Handlers do not import repositories or embed SQL",
+        "Core product flows are covered by tests"
+      ],
+      "test_steps": [
+        "python -m pytest"
+      ],
+      "notes": "Current suite has 85 passing tests."
+    },
+    {
+      "id": "MAT-015",
+      "title": "Adopt Codex TaskOS planning loop",
+      "description": "Install TaskOS, configure project task files, and generate a kanban/dashboard from the project roadmap.",
+      "status": "done",
+      "priority": "P1",
+      "category": "planning",
+      "dependencies": [
+        "MAT-014"
+      ],
+      "scope": [
+        "TaskOS dev dependency",
+        "taskos.toml configuration",
+        "AGENTS.md TaskOS block",
+        "tasks.json source of truth",
+        "Generated Markdown and HTML boards"
+      ],
+      "acceptance_criteria": [
+        "taskos doctor passes",
+        "taskos validate passes",
+        "Generated boards reflect tasks.json"
+      ],
+      "test_steps": [
+        "python -m taskos doctor",
+        "python -m taskos validate"
+      ],
+      "notes": "Completed in this workspace on 2026-05-22."
+    },
+    {
+      "id": "MAT-101",
+      "title": "Choose production target and release checklist",
+      "description": "Decide where the MVP will run first and write the concrete release checklist for credentials, migration, polling safety, and smoke testing.",
+      "status": "done",
+      "priority": "P0",
+      "category": "deployment",
+      "dependencies": [
+        "MAT-013",
+        "MAT-014",
+        "MAT-015"
+      ],
+      "scope": [
+        "Pick Railway, Render, or VPS as the first production target",
+        "List required environment variables and secret handling",
+        "Define database provisioning and migration steps",
+        "Define single-polling-instance safety checks",
+        "Define post-deploy smoke test steps",
+        "Explicitly support using the bot when the local Docker stack is turned off"
+      ],
+      "acceptance_criteria": [
+        "ROADMAP.md and README identify the chosen target",
+        "Release checklist is concrete enough to execute",
+        "No secrets are committed"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_deployment_config.py",
+        "python -m pytest tests/test_deployment_config.py tests/test_project_bootstrap.py",
+        "python -m taskos validate"
+      ],
+      "notes": "User-requested rank 1: make the bot available from a server instead of depending on local Docker."
+    },
+    {
+      "id": "MAT-102",
+      "title": "Finalize production deployment",
+      "description": "Deploy the bot and database to the selected production platform, run migrations, and verify the first real polling instance.",
+      "status": "done",
+      "priority": "P0",
+      "category": "deployment",
+      "dependencies": [
+        "MAT-101"
+      ],
+      "scope": [
+        "Provision PostgreSQL",
+        "Set production environment variables",
+        "Build and run the bot container",
+        "Run Alembic migrations",
+        "Verify onboarding and main menu with the real bot token"
+      ],
+      "acceptance_criteria": [
+        "Production bot runs as a single polling process",
+        "Database migrations are applied",
+        "Smoke test confirms onboarding, menu, task creation, and reminder-safe startup",
+        "The bot remains available when the local Docker stack is stopped"
+      ],
+      "test_steps": [
+        "python -m pytest",
+        "docker compose run --rm bot python -m alembic upgrade head",
+        "ssh BatchMode check reached server and returned publickey/password required",
+        "VPS docker compose ps: bot up, db healthy",
+        "Production alembic_version: 0005_places_show_category",
+        "Bot logs: Start polling for @mately_bot",
+        "python -m pytest tests/test_deployment_config.py tests/test_project_bootstrap.py"
+      ],
+      "notes": "Blocked until a production platform, database, bot token, and deployment credentials are selected. This is the execution half of user-requested rank 1.\nVPS target is chosen, but noninteractive SSH deploy needs key-based root access. Password must not be embedded in commands or files; add an SSH public key or run the first login step manually.\nSSH key access to VPS has been confirmed."
+    },
+    {
+      "id": "MAT-103",
+      "title": "Add reminder controls and quiet-hour settings",
+      "description": "Let the couple control reminder behavior without turning notifications into pressure.",
+      "status": "done",
+      "priority": "P1",
+      "category": "settings",
+      "dependencies": [
+        "MAT-011",
+        "MAT-014",
+        "MAT-113"
+      ],
+      "scope": [
+        "Settings UI for reminder enablement",
+        "Morning and evening reminder time controls",
+        "Disable or gate proactive weekly and monthly recap sends according to the notification matrix",
+        "Quiet-hour or pause behavior",
+        "Persistence in the couple settings model or a small companion table",
+        "Scheduler integration and tests"
+      ],
+      "acceptance_criteria": [
+        "Users can adjust reminder times from Telegram",
+        "Disabled reminders do not enqueue notifications",
+        "Scheduler tests cover custom times and disabled reminders"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_scheduler_system.py",
+        "python -m pytest"
+      ],
+      "notes": "Implement from docs/notification-matrix.md: morning and evening digests only, with proactive weekly/monthly recaps disabled or gated."
+    },
+    {
+      "id": "MAT-104",
+      "title": "Notify partner about shopping changes",
+      "description": "Send soft partner notifications when shopping items are added or bought.",
+      "status": "done",
+      "priority": "P1",
+      "category": "shopping",
+      "dependencies": [
+        "MAT-007",
+        "MAT-011",
+        "MAT-012",
+        "MAT-113"
+      ],
+      "scope": [
+        "Notification on item added",
+        "Notification on item marked bought",
+        "Partner display name usage",
+        "Cat/text fallback behavior",
+        "Dedupe or no-spam protection"
+      ],
+      "acceptance_criteria": [
+        "Only the partner is notified",
+        "Notifications are short and non-judgmental",
+        "Missing media or AI key does not break delivery"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_shopping_service.py tests/test_cat_notification_delivery.py",
+        "python -m pytest"
+      ],
+      "notes": "Implement the shopping rows from docs/notification-matrix.md: notify partner on item added and marked bought only; do not notify on autoarchive."
+    },
+    {
+      "id": "MAT-105",
+      "title": "Notify partner when a place is visited",
+      "description": "Send a soft partner notification when a place is marked visited, with rating, emoji, and not-visited response options.",
+      "status": "done",
+      "priority": "P1",
+      "category": "places",
+      "dependencies": [
+        "MAT-009",
+        "MAT-011",
+        "MAT-012",
+        "MAT-113",
+        "MAT-117"
+      ],
+      "scope": [
+        "Notification on place marked visited",
+        "Rating and emoji request in the notification",
+        "Not visited response from the partner",
+        "Partner display name usage",
+        "No-spam safeguards for repeated visit attempts"
+      ],
+      "acceptance_criteria": [
+        "Only the partner is notified",
+        "Place notifications include the place title and clear action",
+        "The partner can answer that they did not visit without rating",
+        "Delivery keeps existing fallback behavior"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_places_service.py tests/test_cat_notification_delivery.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Implement the places row from docs/notification-matrix.md: visit notification only; do not notify on add, rating, or comment."
+    },
+    {
+      "id": "MAT-106",
+      "title": "Add places filters and richer place memories",
+      "description": "Make the places section easier to browse as the list grows, without overloading the Telegram UI.",
+      "status": "pending",
+      "priority": "P2",
+      "category": "places",
+      "dependencies": [
+        "MAT-009"
+      ],
+      "scope": [
+        "Filter planned vs visited places",
+        "Filter by place category",
+        "Optional rating/date filters if they fit the UI",
+        "Compact visited-place memory card",
+        "Tests for filters and keyboards"
+      ],
+      "acceptance_criteria": [
+        "Places can be filtered without long forms",
+        "Visited places show ratings/comments clearly",
+        "Existing add/visit/rate/comment flows still work"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py"
+      ],
+      "notes": "Places filters were intentionally deferred in the current MVP. This is lower than the user-requested immediate UX fixes."
+    },
+    {
+      "id": "MAT-107",
+      "title": "Expand stats with shopping and places",
+      "description": "Deepen weekly and monthly recaps so they reflect more of the couple's shared life.",
+      "status": "pending",
+      "priority": "P2",
+      "category": "analytics",
+      "dependencies": [
+        "MAT-007",
+        "MAT-009",
+        "MAT-010"
+      ],
+      "scope": [
+        "Shopping item counts",
+        "Visited place counts",
+        "Average place rating",
+        "Optional top memory snippets",
+        "Updated weekly and monthly recap tests"
+      ],
+      "acceptance_criteria": [
+        "Recaps include shopping and places without becoming long",
+        "Timezone-sensitive period logic is preserved",
+        "Existing task/content recap details remain intact"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_analytics_recaps.py"
+      ],
+      "notes": "Preferred future direction from product docs. Coordinate with the new reporting/export and analytics-event tasks."
+    },
+    {
+      "id": "MAT-108",
+      "title": "Add backup and export path",
+      "description": "Give the project a simple way to protect or export couple data before the bot becomes depended on day to day.",
+      "status": "pending",
+      "priority": "P2",
+      "category": "operations",
+      "dependencies": [
+        "MAT-013",
+        "MAT-101"
+      ],
+      "scope": [
+        "Database backup command or platform backup instructions",
+        "Minimal export format decision",
+        "Restore notes for local verification",
+        "README or runbook documentation"
+      ],
+      "acceptance_criteria": [
+        "A backup can be created without exposing secrets",
+        "Restore or import path is documented",
+        "Production notes point to the backup routine"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_deployment_config.py"
+      ],
+      "notes": "Useful before broadening feature scope."
+    },
+    {
+      "id": "MAT-109",
+      "title": "Plan multi-couple data isolation",
+      "description": "Prepare the data-model and repository migration path so multiple couples can safely use the bot in parallel.",
+      "status": "done",
+      "priority": "P0",
+      "category": "data",
+      "dependencies": [
+        "MAT-002",
+        "MAT-014"
+      ],
+      "scope": [
+        "Migration design for tasks",
+        "Migration design for shopping_items",
+        "Migration design for content_items",
+        "Migration design for place_items and notifications",
+        "Repository query updates and compatibility tests",
+        "Explicit rollout plan for several couples using the same deployed bot"
+      ],
+      "acceptance_criteria": [
+        "Migration plan handles existing rows",
+        "No cross-couple data exposure is introduced",
+        "Tests document old and new scoping expectations"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_database_models.py tests/test_task_service.py",
+        "python -m taskos validate",
+        "python -m pytest tests/test_database_models.py tests/test_task_service.py tests/test_shopping_service.py tests/test_content_service.py tests/test_places_service.py tests/test_scheduler_system.py tests/test_analytics_recaps.py"
+      ],
+      "notes": "User-requested rank 2: normalize the system for parallel use by several couples. This planning task must happen before implementation."
+    },
+    {
+      "id": "MAT-112",
+      "title": "Implement multi-couple data isolation",
+      "description": "Apply the multi-couple migration plan so tasks, shopping, content, places, notifications, and analytics are safely scoped per couple.",
+      "status": "done",
+      "priority": "P0",
+      "category": "data",
+      "dependencies": [
+        "MAT-109"
+      ],
+      "scope": [
+        "Add or backfill couple-level ownership where needed",
+        "Update repositories and services to require couple scope",
+        "Update schedulers and notifications to operate per couple",
+        "Add regression tests for two couples using similar data at the same time",
+        "Keep existing one-couple MVP behavior intact"
+      ],
+      "acceptance_criteria": [
+        "No query can expose another couple's tasks, shopping, content, places, notifications, aliases, or analytics",
+        "Two couples can use the bot in parallel in tests",
+        "Migrations handle existing local data safely"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_database_models.py tests/test_task_service.py tests/test_shopping_service.py tests/test_content_service.py tests/test_places_service.py tests/test_scheduler_system.py",
+        "python -m pytest"
+      ],
+      "notes": "User-requested rank 2 implementation task. Start only after MAT-109 defines the migration path."
+    },
+    {
+      "id": "MAT-113",
+      "title": "Normalize notification rules across all blocks",
+      "description": "Create the agreed notification matrix for every bot block before changing notification behavior.",
+      "status": "done",
+      "priority": "P0",
+      "category": "notifications",
+      "dependencies": [
+        "MAT-011",
+        "MAT-014"
+      ],
+      "scope": [
+        "Ask the user for desired notification logic per block when this task starts",
+        "Cover tasks, shopping, content, places, statistics, reminders, morning cleanup, and system events",
+        "Define who receives each notification and when",
+        "Define dedupe/no-spam rules",
+        "Define tone, cat/AI usage, and fallback behavior"
+      ],
+      "acceptance_criteria": [
+        "A notification matrix is documented before implementation tasks proceed",
+        "Each block has explicit send, skip, dedupe, and fallback rules",
+        "Follow-up implementation tasks reference the matrix"
+      ],
+      "test_steps": [
+        "python -m taskos validate"
+      ],
+      "notes": "User-requested rank 3. Notification decisions are documented in docs/notification-matrix.md."
+    },
+    {
+      "id": "MAT-114",
+      "title": "Add 09:00 morning cleanup and task digest",
+      "description": "At 09:00, clean stale bot messages from the previous day and send a soft morning message with unfinished tasks.",
+      "status": "done",
+      "priority": "P1",
+      "category": "chat-cleanup",
+      "dependencies": [
+        "MAT-004",
+        "MAT-006",
+        "MAT-011",
+        "MAT-113"
+      ],
+      "scope": [
+        "Track messages that are safe for the bot to delete",
+        "Delete bot-managed messages left from previous days at 09:00 local couple time",
+        "Build a morning unfinished-task digest",
+        "Add a short good-day wish in the existing warm tone",
+        "Avoid deleting user-authored messages"
+      ],
+      "acceptance_criteria": [
+        "Cleanup runs at 09:00 in the couple timezone",
+        "Only bot-managed stale messages are deleted",
+        "Morning digest includes unfinished tasks and handles the empty state softly",
+        "The job is idempotent after restarts"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_scheduler_system.py tests/test_main_menu_handlers.py tests/test_task_service.py",
+        "python -m pytest tests/test_scheduler_system.py tests/test_main_menu_handlers.py tests/test_task_service.py; taskos validate"
+      ],
+      "notes": "User-requested rank 4. Implement the morning row from docs/notification-matrix.md. Telegram deletion limits may affect very old messages; handle failures gracefully."
+    },
+    {
+      "id": "MAT-115",
+      "title": "Fix statistics period buttons",
+      "description": "When weekly analytics are shown, hide the Week button; when monthly analytics are shown, hide the Month button.",
+      "status": "done",
+      "priority": "P1",
+      "category": "telegram-ux",
+      "dependencies": [
+        "MAT-010",
+        "MAT-014"
+      ],
+      "scope": [
+        "Inspect the statistics keyboard state",
+        "Hide the currently selected period button",
+        "Keep navigation back to the statistics menu clear",
+        "Add or update keyboard tests"
+      ],
+      "acceptance_criteria": [
+        "Weekly view does not show a redundant Week button",
+        "Monthly view does not show a redundant Month button",
+        "Other statistics navigation remains unchanged"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_analytics_recaps.py tests/test_additional_keyboards.py",
+        "python -m pytest tests/test_analytics_recaps.py tests/test_additional_keyboards.py tests/test_main_menu_handlers.py; taskos validate"
+      ],
+      "notes": "User-requested rank 5 quick UX fix."
+    },
+    {
+      "id": "MAT-116",
+      "title": "Use selected category in add buttons",
+      "description": "After choosing a Content or Place category, change the add button copy to include the selected category.",
+      "status": "done",
+      "priority": "P1",
+      "category": "telegram-ux",
+      "dependencies": [
+        "MAT-008",
+        "MAT-009",
+        "MAT-014"
+      ],
+      "scope": [
+        "Update content category flow button text",
+        "Update places category flow button text",
+        "Use Russian category labels in the button",
+        "Keep callback data stable",
+        "Update keyboard tests"
+      ],
+      "acceptance_criteria": [
+        "Selected content category shows Add <selected category>",
+        "Selected place category shows Add <selected category>",
+        "The underlying add flow still creates the right item type"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_keyboards.py tests/test_places_keyboards.py",
+        "python -m pytest tests/test_content_keyboards.py tests/test_places_keyboards.py tests/test_content_service.py tests/test_places_service.py; taskos validate"
+      ],
+      "notes": "User-requested rank 6."
+    },
+    {
+      "id": "MAT-117",
+      "title": "Add not-acquainted response for partner ratings",
+      "description": "When rating completed content or visited places, allow a partner to mark that they are not acquainted without giving a score, reaction, or comment.",
+      "status": "done",
+      "priority": "P1",
+      "category": "content-places",
+      "dependencies": [
+        "MAT-008",
+        "MAT-009",
+        "MAT-014"
+      ],
+      "scope": [
+        "Model the Not acquainted response for content",
+        "Model the Not acquainted response for places",
+        "Skip score, reaction, and comment prompts after this choice",
+        "Show the state clearly in cards or summaries",
+        "Update service and handler tests"
+      ],
+      "acceptance_criteria": [
+        "A partner can choose Not acquainted for completed content",
+        "A partner can choose Not acquainted for visited places",
+        "No score, reaction, or comment is required after the choice",
+        "Average ratings do not treat Not acquainted as a numeric score"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_service.py tests/test_places_service.py tests/test_content_keyboards.py tests/test_places_keyboards.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "User-requested rank 7. Required by docs/notification-matrix.md for content completion and place visit requests. This may require a small schema change or a separate response table."
+    },
+    {
+      "id": "MAT-118",
+      "title": "Remove Filter from the Content menu",
+      "description": "Remove the Filter entry from the main Content block menu while keeping any still-needed list behavior coherent.",
+      "status": "done",
+      "priority": "P1",
+      "category": "content",
+      "dependencies": [
+        "MAT-008",
+        "MAT-014"
+      ],
+      "scope": [
+        "Remove Filter from the Content menu keyboard",
+        "Check whether hidden filter callbacks should remain supported or be retired",
+        "Adjust tests and any menu copy affected by the change"
+      ],
+      "acceptance_criteria": [
+        "The Content menu no longer shows Filter",
+        "Content listing still opens without dead-end callbacks",
+        "Tests match the simplified menu"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_keyboards.py tests/test_content_service.py",
+        "python -m pytest tests/test_content_keyboards.py tests/test_content_service.py; taskos validate"
+      ],
+      "notes": "User-requested rank 8."
+    },
+    {
+      "id": "MAT-120",
+      "title": "Design analytics event dataset for Amplitude",
+      "description": "Prepare reporting events and a table that describes every log/event collected for Amplitude analytics.",
+      "status": "pending",
+      "priority": "P2",
+      "category": "analytics",
+      "dependencies": [
+        "MAT-102",
+        "MAT-112"
+      ],
+      "scope": [
+        "List product questions analytics should answer",
+        "Define event names and properties for onboarding, tasks, shopping, content, places, notifications, and errors",
+        "Define privacy boundaries and fields that must never be logged",
+        "Prepare a table describing every collected event",
+        "Plan Amplitude ingestion without blocking core bot behavior"
+      ],
+      "acceptance_criteria": [
+        "An analytics event catalog exists",
+        "Each event has owner, trigger, properties, and privacy notes",
+        "Amplitude implementation can proceed from the catalog",
+        "No sensitive message text or secrets are planned for logging"
+      ],
+      "test_steps": [
+        "python -m taskos validate"
+      ],
+      "notes": "User-requested rank 10. Keep this after deployment and multi-couple isolation so analytics are scoped correctly."
+    },
+    {
+      "id": "MAT-121",
+      "title": "Bold the partner invite code",
+      "description": "Highlight the code that should be sent to the partner in bold so it is easier to copy and notice during onboarding.",
+      "status": "done",
+      "priority": "P1",
+      "category": "onboarding-ux",
+      "dependencies": [
+        "MAT-003",
+        "MAT-014"
+      ],
+      "scope": [
+        "Find the onboarding message that shows the partner invite code",
+        "Wrap only the actual code in Telegram bold formatting",
+        "Keep escaping/parse mode safe",
+        "Update onboarding handler tests"
+      ],
+      "acceptance_criteria": [
+        "The invite code is visually bold in Telegram",
+        "The surrounding instruction text stays readable",
+        "The code remains copyable and not broken by formatting"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_onboarding_handlers.py tests/test_couple_service.py",
+        "python -m pytest tests/test_onboarding_handlers.py tests/test_couple_service.py; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-25."
+    },
+    {
+      "id": "MAT-122",
+      "title": "Prompt couple creator to name the joined partner",
+      "description": "When a partner joins the shared space, prompt the original couple creator to set the partner sticker/emoji and three name cases.",
+      "status": "done",
+      "priority": "P1",
+      "category": "onboarding-ux",
+      "dependencies": [
+        "MAT-003",
+        "MAT-005",
+        "MAT-014"
+      ],
+      "scope": [
+        "Detect the user who originally initiated the couple",
+        "After partner joins, send that creator the partner alias setup prompt",
+        "Collect sticker/emoji plus nominative, genitive, and dative name forms",
+        "Avoid duplicate prompts if alias is already set",
+        "Update onboarding and partner alias tests"
+      ],
+      "acceptance_criteria": [
+        "The creator is prompted after the second partner joins",
+        "The prompt requests sticker/emoji and three grammatical cases",
+        "Existing alias fallback behavior remains intact",
+        "No duplicate prompt is sent after restart or repeated /start"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_onboarding_handlers.py tests/test_couple_service.py tests/test_task_service.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-25."
+    },
+    {
+      "id": "MAT-123",
+      "title": "Render task text as Quote",
+      "description": "Display task titles or task text in Telegram quote formatting where task cards/messages show the task itself.",
+      "status": "done",
+      "priority": "P1",
+      "category": "tasks-ux",
+      "dependencies": [
+        "MAT-006",
+        "MAT-014"
+      ],
+      "scope": [
+        "Identify task cards and notification messages that display task text",
+        "Use Telegram quote formatting for the task content",
+        "Keep status, assignee, deadline, and actions outside the quote",
+        "Update task service/handler tests"
+      ],
+      "acceptance_criteria": [
+        "Task text appears as a quote in Telegram task cards/messages",
+        "Task action buttons still work",
+        "Formatting is escaped safely for user-entered task titles"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_task_service.py tests/test_task_keyboards.py tests/test_task_block_handlers.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-25."
+    },
+    {
+      "id": "MAT-124",
+      "title": "Render content and place titles as Spoiler",
+      "description": "Display content titles and planned/visited place names in Telegram spoiler formatting to keep long lists playful and less visually loud.",
+      "status": "done",
+      "priority": "P1",
+      "category": "content-places-ux",
+      "dependencies": [
+        "MAT-008",
+        "MAT-009",
+        "MAT-014"
+      ],
+      "scope": [
+        "Apply spoiler formatting to content titles in cards and lists",
+        "Apply spoiler formatting to place titles in cards and lists",
+        "Keep categories, statuses, ratings, and comments readable outside spoilers",
+        "Escape user-entered titles safely",
+        "Update content and places tests"
+      ],
+      "acceptance_criteria": [
+        "Content titles appear as spoilers in Telegram",
+        "Place titles appear as spoilers in Telegram",
+        "Spoiler formatting does not break callbacks, media captions, or list navigation"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_service.py tests/test_content_keyboards.py tests/test_content_media_panels.py tests/test_places_service.py tests/test_places_keyboards.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-25."
+    },
+    {
+      "id": "MAT-125",
+      "title": "Allow deleting completed-task notifications",
+      "description": "Let the user delete a completed-task notification and also remove the related assignment info message if it is still present in that chat.",
+      "status": "pending",
+      "priority": "P1",
+      "category": "tasks-ux",
+      "dependencies": [
+        "MAT-006",
+        "MAT-011",
+        "MAT-014"
+      ],
+      "scope": [
+        "Add a delete action to completed-task notifications",
+        "Track or resolve the related assignment info message for the same task/user chat",
+        "Delete the completed notification message",
+        "Delete the assignment info message if Telegram still allows it and it still exists",
+        "Handle missing or already-deleted messages quietly"
+      ],
+      "acceptance_criteria": [
+        "The completed-task notification can be removed from chat",
+        "The related assignment info message is also removed when available",
+        "Deletion failures do not show noisy errors to the user",
+        "Unrelated task messages are not deleted"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_task_service.py tests/test_main_menu_handlers.py tests/test_scheduler_system.py"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-25."
+    },
+    {
+      "id": "MAT-126",
+      "title": "Connect production-grade AI messaging",
+      "description": "Replace the visible placeholder-like AI behavior with a properly configured, natural AI message layer for the bot's cozy notifications and summaries.",
+      "status": "pending",
+      "priority": "P1",
+      "category": "cozy-layer",
+      "dependencies": [
+        "MAT-012",
+        "MAT-014",
+        "MAT-103"
+      ],
+      "scope": [
+        "Audit the current cozy AI prompts and fallback texts that feel like placeholders",
+        "Configure the production AI provider and model through environment settings",
+        "Improve prompt context for task completion, content completion, place visits, morning digests, and evening digests",
+        "Keep deterministic fallback behavior when the AI key is missing or the provider fails",
+        "Add quality and safety tests for generated-message sanitization, length, tone, and fallback behavior",
+        "Document required production AI environment variables without committing secrets"
+      ],
+      "acceptance_criteria": [
+        "With a valid AI key, notification suffixes no longer read like generic placeholders",
+        "AI output stays short, warm, relevant to the triggering event, and safe for Telegram HTML",
+        "Missing or failing AI still falls back without breaking bot flows",
+        "Production configuration for the AI provider is documented and test-covered"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_cozy_ai.py tests/test_cat_notification_delivery.py tests/test_scheduler_system.py"
+      ],
+      "notes": "Added from user feedback on 2026-05-25: current AI behavior looks like a stub and should be upgraded before polishing notification tone."
+    },
+    {
+      "id": "MAT-119",
+      "title": "Export content and places to a smart table",
+      "description": "Provide an export of watched/long-list content and visited/long-list places, ideally as a Google Sheets link with two sheets.",
+      "status": "pending",
+      "priority": "P3",
+      "category": "export",
+      "dependencies": [
+        "MAT-008",
+        "MAT-009",
+        "MAT-109"
+      ],
+      "scope": [
+        "Define export columns for content and places",
+        "Include watched/completed content and long-list content",
+        "Include visited places and long-list places",
+        "Prefer Google Sheets with two sheets when credentials are available",
+        "Provide a safe fallback export format if Google Sheets credentials are missing"
+      ],
+      "acceptance_criteria": [
+        "A user can request an export from the bot",
+        "The export contains separate Content and Places sheets or sections",
+        "Only the requesting couple's data is exported",
+        "The bot returns a usable link or file without leaking secrets"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_content_service.py tests/test_places_service.py"
+      ],
+      "notes": "Moved to the long list on 2026-05-25. Google Sheets integration will need a credentials decision before implementation."
+    },
+    {
+      "id": "MAT-127",
+      "title": "Allow photo uploads for visited places",
+      "description": "Let users attach photos to a place after it has been marked visited, so visited-place memories can include real snapshots.",
+      "status": "pending",
+      "priority": "P3",
+      "category": "places",
+      "dependencies": [
+        "MAT-009",
+        "MAT-014"
+      ],
+      "scope": [
+        "Decide the storage model for Telegram photo file IDs or external photo URLs",
+        "Allow adding one or more photos only for visited places",
+        "Show that a visited place has photos in the place card or visited list",
+        "Keep photo access scoped to the requesting couple",
+        "Handle unsupported files or failed uploads softly"
+      ],
+      "acceptance_criteria": [
+        "A user can upload a photo for a visited place",
+        "Photos cannot be attached to another couple's place",
+        "Planned places either reject photo uploads or ask the user to mark the place visited first",
+        "Visited-place cards clearly show when photos are available"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py"
+      ],
+      "notes": "Added to the long list from user request on 2026-05-25."
+    },
+    {
+      "id": "MAT-110",
+      "title": "Evaluate Redis or Celery only if scheduling needs grow",
+      "description": "Decide whether APScheduler remains sufficient after production use, before adding more infrastructure.",
+      "status": "pending",
+      "priority": "P3",
+      "category": "infrastructure",
+      "dependencies": [
+        "MAT-102",
+        "MAT-103"
+      ],
+      "scope": [
+        "Review production scheduler reliability",
+        "Identify jobs that require durable queues",
+        "Compare APScheduler, Redis, and Celery operational cost",
+        "Document recommendation"
+      ],
+      "acceptance_criteria": [
+        "A decision is documented with tradeoffs",
+        "No new queue infrastructure is added without a concrete need",
+        "Reminder and recap reliability requirements are clear"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_scheduler_system.py"
+      ],
+      "notes": "Redis/Celery is explicitly out of MVP scope."
+    },
+    {
+      "id": "MAT-111",
+      "title": "Run optional Telegram WebApp feasibility spike",
+      "description": "Explore whether a WebApp would meaningfully improve dense flows such as filters, memories, or settings.",
+      "status": "pending",
+      "priority": "P3",
+      "category": "product-spike",
+      "dependencies": [
+        "MAT-101",
+        "MAT-106",
+        "MAT-107"
+      ],
+      "scope": [
+        "Identify Telegram UI pain points",
+        "Sketch one WebApp candidate flow",
+        "Estimate implementation and hosting cost",
+        "Recommend build, defer, or avoid"
+      ],
+      "acceptance_criteria": [
+        "Decision is based on real UI friction",
+        "The bot remains useful without a WebApp",
+        "No WebApp implementation starts during the spike"
+      ],
+      "test_steps": [
+        "python -m taskos validate"
+      ],
+      "notes": "Future option only if Telegram UI becomes limiting."
+    }
+  ]
+}

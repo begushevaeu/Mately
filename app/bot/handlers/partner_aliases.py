@@ -1,6 +1,6 @@
 import logging
 
-from aiogram import Bot, F, Router
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -17,6 +17,16 @@ from app.services.tasks import TaskService, TaskServiceError
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+INITIAL_ALIAS_PROMPT_TEXT = (
+    "Давайте настроим, как партнер будет отображаться у тебя.\n\n"
+    "Сначала отправь эмодзи для партнера. Например: 🥒"
+)
+
+CREATOR_ALIAS_PROMPT_TEXT = (
+    "Партнер подключился к вашему пространству. Давайте настроим, как он будет отображаться у тебя.\n\n"
+    "Сначала отправь эмодзи для партнера. Например: 🥒"
+)
 
 
 async def get_partner_for_alias(result: OnboardingResult, session: AsyncSession):
@@ -87,6 +97,30 @@ async def reset_additional_block(bot: Bot, session: AsyncSession, result: Onboar
     )
 
 
+async def start_partner_alias_prompt(
+    *,
+    bot: Bot,
+    session: AsyncSession,
+    owner,
+    partner,
+    chat_id: int,
+    state: FSMContext,
+    text: str,
+) -> bool:
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=owner)
+    await reset_alias_block(bot, session, result, chat_id)
+    try:
+        sent_message = await bot.send_message(chat_id, text, reply_markup=build_cancel_menu())
+    except TelegramAPIError:
+        logger.exception("Failed to send partner alias prompt")
+        return False
+
+    await state.set_state(PartnerAliasStates.waiting_for_emoji)
+    await state.update_data(partner_user_id=partner.id)
+    await add_alias_block_messages(session, result, sent_message, [sent_message])
+    return True
+
+
 async def maybe_prompt_partner_alias(
     message: Message,
     result: OnboardingResult,
@@ -108,20 +142,52 @@ async def maybe_prompt_partner_alias(
     if await PartnerAliasService(session).has_alias_for(owner=result.user, partner=partner):
         return
 
-    await state.set_state(PartnerAliasStates.waiting_for_emoji)
-    await state.update_data(partner_user_id=partner.id)
-    await ChatBlockService(session).reset_block(
+    await start_partner_alias_prompt(
         bot=bot,
-        user=result.user,
+        session=session,
+        owner=result.user,
+        partner=partner,
         chat_id=message.chat.id,
-        block_key=PARTNER_ALIAS_BLOCK_KEY,
+        state=state,
+        text=INITIAL_ALIAS_PROMPT_TEXT,
     )
-    await send_alias_prompt(
-        message,
-        session,
-        result,
-        "Давайте настроим, как партнер будет отображаться у тебя.\n\n"
-        "Сначала отправь эмодзи для партнера. Например: 🥒",
+
+
+async def maybe_prompt_couple_creator_for_joined_partner(
+    *,
+    bot: Bot,
+    dispatcher: Dispatcher,
+    session: AsyncSession,
+    result: OnboardingResult,
+) -> None:
+    if result.status is not OnboardingStatus.IN_COUPLE:
+        return
+
+    try:
+        context = await TaskService(session).get_context(result.user)
+    except TaskServiceError:
+        return
+
+    creator = context.members[0] if context.members else None
+    if creator is None or creator.id == result.user.id:
+        return
+
+    if await PartnerAliasService(session).has_alias_for(owner=creator, partner=result.user):
+        return
+
+    creator_state = dispatcher.fsm.get_context(
+        bot=bot,
+        chat_id=creator.telegram_id,
+        user_id=creator.telegram_id,
+    )
+    await start_partner_alias_prompt(
+        bot=bot,
+        session=session,
+        owner=creator,
+        partner=result.user,
+        chat_id=creator.telegram_id,
+        state=creator_state,
+        text=CREATOR_ALIAS_PROMPT_TEXT,
     )
 
 

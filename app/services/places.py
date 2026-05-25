@@ -91,6 +91,10 @@ NOT_ACQUAINTED_RESPONSE = "NOT_ACQUAINTED"
 RATED_RESPONSE = "RATED"
 
 
+def format_place_title_spoiler(item: PlaceItem) -> str:
+    return f"<tg-spoiler>{escape(item.title)}</tg-spoiler>"
+
+
 class PlaceService:
     def __init__(
         self,
@@ -158,7 +162,8 @@ class PlaceService:
             item=item,
             notification_user=partner,
             notification_text=(
-                f"{actor_label.nominative_with_emoji} отметил(а) «{item.title}» как посещённое. "
+                f"{escape(actor_label.nominative_with_emoji)} отметил(а) {format_place_title_spoiler(item)} "
+                "как посещённое. "
                 "Поставь оценку или нажми «Не был(а)»."
             ),
             cozy_theme=CozyMessageTheme.PLACE_VISITED,
@@ -197,7 +202,7 @@ class PlaceService:
     async def build_place_card(self, context: PlaceContext, item: PlaceItem) -> str:
         owner_label = await self._actor_line(context, item.added_by)
         lines = [
-            f"{category_label(item.category)} <b>{escape(item.title)}</b>",
+            f"{category_label(item.category)} {format_place_title_spoiler(item)}",
             f"Статус: {status_label(item)}",
             f"Добавил(а): {owner_label}",
             f"Средняя оценка: {format_average_rating(item)}",

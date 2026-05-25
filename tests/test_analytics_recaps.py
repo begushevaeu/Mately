@@ -46,6 +46,7 @@ def test_weekly_recap_counts_completed_tasks_content_ratings_and_overdue() -> No
     completed_content.ratings = [
         Rating(content_id=1, user_id=1, score=9, emoji=None),
         Rating(content_id=1, user_id=2, score=7, emoji=None),
+        Rating(content_id=1, user_id=3, score=None, emoji=None, response="NOT_ACQUAINTED"),
     ]
     old_content = ContentItem(
         id=2,

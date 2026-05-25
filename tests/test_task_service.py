@@ -267,7 +267,7 @@ async def test_archive_one_time_task_hides_it_from_active_lists() -> None:
     assert archived.task.status == "ARCHIVED"
     assert active_tasks == []
     assert archived.notification_user is partner
-    assert archived.notification_text == "One удалил(а) задачу «Разобрать пакеты»."
+    assert archived.notification_text == "One удалил(а) задачу.\n\n<blockquote>🐻 Разобрать пакеты</blockquote>"
     assert task_repository.history[-1] == (created.task.id, "ARCHIVED", creator.id)
 
 
@@ -290,7 +290,7 @@ async def test_archiving_recurring_task_stops_future_occurrences() -> None:
     assert archived.task.status == "ARCHIVED"
     assert archived.next_task is None
     assert task_repository.next_id == 2
-    assert archived.notification_text == "Two остановил(а) повтор задачи «Полить цветы»."
+    assert archived.notification_text == "Two остановил(а) повтор задачи.\n\n<blockquote>🐻 Полить цветы</blockquote>"
     assert task_repository.history[-1] == (created.task.id, "ARCHIVED", partner.id)
 
 
@@ -383,8 +383,8 @@ async def test_partner_aliases_are_used_in_notifications_and_cards() -> None:
     context = await service.get_context(creator)
     card = await service.build_task_card(context, result.task, show_ownership=True)
 
-    assert result.notification_text == "От 🐵Обезьянки: тебе назначили задачу «Помыть пол»."
-    assert "🐻 <b>Помыть пол</b>" in card
+    assert result.notification_text == "От 🐵Обезьянки: тебе назначили задачу.\n\n<blockquote>🐻 Помыть пол</blockquote>"
+    assert "<blockquote>🐻 Помыть пол</blockquote>" in card
     assert "От: тебя" in card
     assert "Кому: 🥒Огурчику" in card
 
@@ -410,7 +410,7 @@ def test_task_title_emoji_rotates_by_task_id() -> None:
         )
 
         assert build_task_summary(task, "Europe/Moscow").startswith(
-            f"{expected_emoji} <b>Задача {task_id}</b>"
+            f"<blockquote>{expected_emoji} Задача {task_id}</blockquote>"
         )
 
 

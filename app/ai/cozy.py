@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 from enum import StrEnum
+from html import escape as escape_html
 from typing import Any
 
 from app.core.config import Settings, get_settings
@@ -150,6 +151,7 @@ async def append_cozy_suffix(
     theme: CozyMessageTheme | None,
     subject: str | None = None,
     generator: CozyMessageGenerator | None = None,
+    escape_suffix: bool = False,
 ) -> str:
     if theme is None:
         return base_text
@@ -157,5 +159,8 @@ async def append_cozy_suffix(
     cozy = await (generator or CozyMessageGenerator()).generate(theme, subject=subject)
     if not cozy:
         return base_text
+
+    if escape_suffix:
+        cozy = escape_html(cozy)
 
     return f"{base_text}\n\n{cozy}"

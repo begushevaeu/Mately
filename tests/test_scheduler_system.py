@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
+from types import SimpleNamespace
 
+import pytest
+
+from app.services.chat_blocks import BOT_MANAGED_BLOCK_KEY_SUFFIX
 from app.models import Couple, CoupleReminderSettings, Task, User
 from app.schedulers.system import (
     EVENING_REMINDER_TIME,
     MORNING_REMINDER_TIME,
+    CoupleScheduleContext,
+    build_morning_task_digest_text,
     build_dedupe_key,
+    cleanup_stale_bot_messages_for_context,
     due_reminder_types,
     is_same_local_minute,
     local_schedule_datetime,
@@ -103,3 +110,74 @@ def test_scheduler_task_filters_use_deadlines() -> None:
 
     assert tasks_due_on_local_date([due_today, overdue, later], now) == [due_today]
     assert overdue_tasks([due_today, overdue, later], now) == [due_today, overdue]
+
+
+def test_morning_digest_lists_unfinished_tasks_and_empty_state() -> None:
+    now = datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)
+    yesterday = datetime(2026, 5, 19, 18, 0, tzinfo=timezone.utc)
+    active = Task(id=1, couple_id=1, title="Полить цветы", created_by=1, status="ASSIGNED", deadline=now)
+    overdue = Task(id=2, couple_id=1, title="Купить корм", created_by=1, status="OVERDUE", deadline=yesterday)
+    completed = Task(id=3, couple_id=1, title="Собрать сумку", created_by=1, status="COMPLETED", deadline=now)
+
+    text = build_morning_task_digest_text([active, overdue, completed], local_now=now, now=now)
+    empty_text = build_morning_task_digest_text([], local_now=now, now=now)
+
+    assert "Незавершённые задачи" in text
+    assert "Полить цветы (просрочена)" in text
+    assert "Купить корм (просрочена)" in text
+    assert "Собрать сумку" not in text
+    assert "Просроченных: 2." in text
+    assert "Незавершённых задач нет" in empty_text
+
+
+@pytest.mark.asyncio
+async def test_morning_cleanup_deletes_only_stale_bot_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    stale_block = SimpleNamespace(user_id=20, chat_id=2000, block_key="tasks:bot", message_ids=[101, 102])
+
+    class FakeChatBlockRepository:
+        calls: list[dict] = []
+        cleared: list[tuple[int, int, str]] = []
+
+        def __init__(self, _session) -> None:
+            pass
+
+        async def list_stale_blocks_for_users(self, **kwargs):
+            self.__class__.calls.append(kwargs)
+            return [stale_block]
+
+        async def clear(self, *, user_id: int, chat_id: int, block_key: str) -> None:
+            self.__class__.cleared.append((user_id, chat_id, block_key))
+
+    class FakeBot:
+        deleted_messages: list[tuple[int, int]]
+
+        def __init__(self) -> None:
+            self.deleted_messages = []
+
+        async def delete_message(self, *, chat_id: int, message_id: int) -> None:
+            self.deleted_messages.append((chat_id, message_id))
+
+    monkeypatch.setattr("app.schedulers.system.ChatBlockRepository", FakeChatBlockRepository)
+    context = CoupleScheduleContext(
+        couple=Couple(id=10, invite_code="ABC12345", timezone="Europe/Moscow"),
+        members=[
+            User(id=20, telegram_id=200, username=None, first_name=None),
+            User(id=21, telegram_id=201, username=None, first_name=None),
+        ],
+        local_now=datetime(2026, 5, 20, 9, 0, tzinfo=timezone(timedelta(hours=3))),
+        now=datetime(2026, 5, 20, 6, 0, tzinfo=timezone.utc),
+    )
+    bot = FakeBot()
+
+    deleted_count = await cleanup_stale_bot_messages_for_context(object(), bot, context)
+
+    assert deleted_count == 2
+    assert bot.deleted_messages == [(2000, 101), (2000, 102)]
+    assert FakeChatBlockRepository.cleared == [(20, 2000, "tasks:bot")]
+    assert FakeChatBlockRepository.calls == [
+        {
+            "user_ids": [20, 21],
+            "block_key_suffix": BOT_MANAGED_BLOCK_KEY_SUFFIX,
+            "updated_before": datetime(2026, 5, 19, 21, 0, tzinfo=timezone.utc),
+        }
+    ]

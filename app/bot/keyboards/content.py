@@ -31,7 +31,6 @@ def build_content_menu() -> InlineKeyboardMarkup:
                     InlineKeyboardButton(text="В планах", callback_data=CONTENT_PLANNED_CALLBACK),
                     InlineKeyboardButton(text="Завершённое", callback_data=CONTENT_COMPLETED_CALLBACK),
                 ],
-                [InlineKeyboardButton(text="Фильтры", callback_data=CONTENT_FILTERS_CALLBACK)],
             ]
         ),
         CONTENT_BLOCK_KEY,

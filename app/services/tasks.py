@@ -87,6 +87,14 @@ def get_task_title_emoji(task: Task) -> str:
     return TASK_TITLE_EMOJIS[(task_id - 1) % len(TASK_TITLE_EMOJIS)]
 
 
+def format_task_quote(task: Task) -> str:
+    return f"<blockquote>{get_task_title_emoji(task)} {escape(task.title)}</blockquote>"
+
+
+def build_task_notification_text(actor_label: str, action_text: str, task: Task) -> str:
+    return f"{escape(actor_label)} {action_text}.\n\n{format_task_quote(task)}"
+
+
 def format_recurrence_label(recurrence_type: str, interval_days: int | None) -> str:
     if recurrence_type == RecurrenceType.DAILY:
         return "каждый день"
@@ -180,7 +188,7 @@ def build_task_summary(task: Task, timezone_name: str) -> str:
         recurring_label = f"\nПовтор: {format_recurrence_label(task.recurrence_type, task.recurrence_interval_days)}"
 
     return (
-        f"{get_task_title_emoji(task)} <b>{escape(task.title)}</b>\n"
+        f"{format_task_quote(task)}\n"
         f"Статус: {status_label}\n"
         f"Срок: {format_deadline(task.deadline, timezone_name)}"
         f"{recurring_label}"
@@ -240,7 +248,11 @@ class TaskService:
             return TaskMutationResult(
                 task=task,
                 notification_user=partner,
-                notification_text=f"От {actor_label.genitive_with_emoji}: тебе назначили задачу «{task.title}».",
+                notification_text=build_task_notification_text(
+                    f"От {actor_label.genitive_with_emoji}:",
+                    "тебе назначили задачу",
+                    task,
+                ),
                 cozy_theme=CozyMessageTheme.TASK_ASSIGNED,
                 cozy_subject=task.title,
             )
@@ -250,7 +262,11 @@ class TaskService:
             return TaskMutationResult(
                 task=task,
                 notification_user=partner,
-                notification_text=f"От {actor_label.genitive_with_emoji}: в ярмарке задач появилась «{task.title}».",
+                notification_text=build_task_notification_text(
+                    f"От {actor_label.genitive_with_emoji}:",
+                    "в ярмарке задач появилась новая задача",
+                    task,
+                ),
                 cozy_theme=CozyMessageTheme.TASK_ASSIGNED,
                 cozy_subject=task.title,
             )
@@ -310,7 +326,11 @@ class TaskService:
         await self.tasks.add_history(task_id=task.id, event_type="ASSIGNED", actor_id=current_user.id)
         partner = context.partner
         actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
-        notification_text = f"{actor_label.nominative_with_emoji} взял(а) задачу «{task.title}»."
+        notification_text = build_task_notification_text(
+            actor_label.nominative_with_emoji,
+            "взял(а) задачу",
+            task,
+        )
         return TaskMutationResult(
             task=task,
             notification_user=partner,
@@ -330,9 +350,13 @@ class TaskService:
         next_task = await self._create_next_recurring_task(context=context, task=task, actor_id=current_user.id)
         partner = context.partner
         actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
-        notification_text = f"{actor_label.nominative_with_emoji} выполнил(а) задачу «{task.title}»."
+        notification_text = build_task_notification_text(
+            actor_label.nominative_with_emoji,
+            "выполнил(а) задачу",
+            task,
+        )
         if next_task is not None:
-            notification_text = f"{notification_text} Следующий повтор уже создан."
+            notification_text = f"{notification_text}\n\nСледующий повтор уже создан."
         return TaskMutationResult(
             task=task,
             notification_user=partner,
@@ -357,7 +381,11 @@ class TaskService:
         return TaskMutationResult(
             task=task,
             notification_user=partner,
-            notification_text=f"{actor_label.nominative_with_emoji} {action_text} «{task.title}».",
+            notification_text=build_task_notification_text(
+                actor_label.nominative_with_emoji,
+                action_text,
+                task,
+            ),
             cozy_theme=CozyMessageTheme.TASK_ARCHIVED,
             cozy_subject=task.title,
         )

@@ -20,8 +20,10 @@ class FakeMessage:
         self.text = text
         self.chat = FakeChat()
         self.sent_messages: list[FakeMessage] = []
+        self.answers: list[tuple[tuple, dict]] = []
 
-    async def answer(self, *_args, **_kwargs) -> "FakeMessage":
+    async def answer(self, *args, **kwargs) -> "FakeMessage":
+        self.answers.append((args, kwargs))
         sent_message = FakeMessage(message_id=1000 + len(self.sent_messages), text="")
         self.sent_messages.append(sent_message)
         return sent_message
@@ -33,6 +35,10 @@ class FakeState:
 
     async def clear(self) -> None:
         self.events.append("clear_state")
+
+
+class FakeDispatcher:
+    pass
 
 
 class FakeCoupleService:
@@ -77,20 +83,32 @@ async def test_successful_invite_code_cleans_onboarding_block_before_final_messa
     async def fake_maybe_prompt_partner_alias(*_args, **_kwargs) -> None:
         events.append("alias_prompt")
 
+    async def fake_maybe_prompt_couple_creator(*_args, **_kwargs) -> None:
+        events.append("creator_alias_prompt")
+
     monkeypatch.setattr(onboarding, "get_current_onboarding_result", fake_get_current_onboarding_result)
     monkeypatch.setattr(onboarding, "CoupleService", FakeCoupleService)
     monkeypatch.setattr(onboarding, "ChatBlockService", FakeChatBlockService)
     monkeypatch.setattr(onboarding, "answer_for_onboarding_state", fake_answer_for_onboarding_state)
     monkeypatch.setattr(onboarding, "maybe_prompt_partner_alias", fake_maybe_prompt_partner_alias)
+    monkeypatch.setattr(onboarding, "maybe_prompt_couple_creator_for_joined_partner", fake_maybe_prompt_couple_creator)
 
     await onboarding.handle_invite_code(
         message,
         state=FakeState(events),
         session=None,
         bot=object(),
+        dispatcher=FakeDispatcher(),
     )
 
-    assert events == ["remember:42", "clear_state", "reset_onboarding", "answer:IN_COUPLE", "alias_prompt"]
+    assert events == [
+        "remember:42",
+        "clear_state",
+        "reset_onboarding",
+        "answer:IN_COUPLE",
+        "alias_prompt",
+        "creator_alias_prompt",
+    ]
 
 
 @pytest.mark.asyncio
@@ -124,3 +142,21 @@ async def test_cancel_clears_state_resets_blocks_and_returns_to_safe_menu(monkey
         "answer:IN_COUPLE",
     ]
     assert len(message.sent_messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_partner_message_bolds_invite_code() -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name="One")
+    message = FakeMessage(message_id=42)
+    result = OnboardingResult(
+        status=OnboardingStatus.WAITING_FOR_PARTNER,
+        user=user,
+        invite_code="ABC12345",
+    )
+
+    await onboarding.answer_for_onboarding_state(message, result)
+
+    text, kwargs = message.answers[0]
+    assert "<b>ABC12345</b>" in text[0]
+    assert "Отправь партнеру этот код" in text[0]
+    assert kwargs["parse_mode"] == "HTML"

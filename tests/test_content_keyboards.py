@@ -3,7 +3,11 @@ from app.bot.keyboards.content import (
     ADD_CONTENT_CALLBACK,
     CONTENT_COMPLETED_CALLBACK,
     CONTENT_EMOJI_SKIP_CALLBACK,
+    CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX,
     CONTENT_PLANNED_CALLBACK,
+    build_content_notification_keyboard,
+    build_content_rating_keyboard,
+    build_content_category_keyboard,
     build_content_list_keyboard,
     build_content_menu,
     build_content_reaction_keyboard,
@@ -25,8 +29,25 @@ def test_content_menu_contains_core_actions() -> None:
         CONTENT_PLANNED_CALLBACK,
         CONTENT_COMPLETED_CALLBACK,
     ]
+    assert "Фильтры" not in [button.text for button in buttons]
     assert buttons[-1].text == "Закрыть"
     assert buttons[-1].callback_data == close_block_callback(CONTENT_BLOCK_KEY)
+
+
+def test_content_create_category_buttons_include_add_action_and_keep_callbacks() -> None:
+    buttons = extract_buttons(build_content_category_keyboard(mode="create"))
+    texts_by_callback = {button.callback_data: button.text for button in buttons}
+
+    assert texts_by_callback["content:create:category:movie"] == "Добавить 🎬 Фильм"
+    assert texts_by_callback["content:create:category:book"] == "Добавить 📚 Книга"
+
+
+def test_content_filter_category_buttons_keep_plain_category_labels() -> None:
+    buttons = extract_buttons(build_content_category_keyboard(mode="filter"))
+    texts_by_callback = {button.callback_data: button.text for button in buttons}
+
+    assert texts_by_callback["content:filter:category:movie"] == "🎬 Фильм"
+    assert texts_by_callback["content:filter:category:book"] == "📚 Книга"
 
 
 def test_content_list_keyboard_switches_action_by_status() -> None:
@@ -58,3 +79,17 @@ def test_content_reaction_keyboard_uses_updated_reaction_set() -> None:
     assert [len(row) for row in reaction_rows] == [3, 3, 3]
     assert buttons[-2].callback_data == CONTENT_EMOJI_SKIP_CALLBACK
     assert buttons[-1].text == "Закрыть"
+
+
+def test_content_rating_keyboard_allows_not_acquainted_response() -> None:
+    buttons = extract_buttons(build_content_rating_keyboard(content_id=42))
+
+    assert "Не знаком(а)" in [button.text for button in buttons]
+    assert f"{CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX}:42" in [button.callback_data for button in buttons]
+
+
+def test_content_notification_keyboard_allows_not_acquainted_response() -> None:
+    buttons = extract_buttons(build_content_notification_keyboard(content_id=42))
+
+    assert [button.text for button in buttons] == ["Поставить оценку", "Не знаком(а)"]
+    assert buttons[1].callback_data == f"{CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX}:42"

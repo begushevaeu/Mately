@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "codex-taskos @ git+https://github.com/ianssensQ/codex-taskos.git@20c6af4e6559a591d931a87460574bf75c919ced",
     "pytest>=8.0,<9.0",
     "pytest-asyncio>=0.23,<1.0",
 ]

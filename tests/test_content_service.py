@@ -93,12 +93,36 @@ class FakeContentRepository:
                 user_id=user_id,
                 score=score,
                 emoji=emoji,
+                response="RATED",
             )
             self.next_rating_id += 1
             self.ratings.append(rating)
         else:
             rating.score = score
             rating.emoji = emoji
+            rating.response = "RATED"
+        return rating
+
+    async def upsert_not_acquainted(self, *, content_id: int, user_id: int) -> Rating:
+        rating = next(
+            (rating for rating in self.ratings if rating.content_id == content_id and rating.user_id == user_id),
+            None,
+        )
+        if rating is None:
+            rating = Rating(
+                id=self.next_rating_id,
+                content_id=content_id,
+                user_id=user_id,
+                score=None,
+                emoji=None,
+                response="NOT_ACQUAINTED",
+            )
+            self.next_rating_id += 1
+            self.ratings.append(rating)
+        else:
+            rating.score = None
+            rating.emoji = None
+            rating.response = "NOT_ACQUAINTED"
         return rating
 
     async def add_comment(self, *, content_id: int, user_id: int, text: str) -> Comment:
@@ -147,12 +171,47 @@ async def test_content_can_be_added_completed_and_rated() -> None:
     assert item.title == "Интерстеллар"
     assert completed.item.status == "COMPLETED"
     assert completed.notification_user is creator
-    assert completed.notification_text == "Two отметил(а) «Интерстеллар» как завершённое. Хочешь поставить оценку?"
+    assert (
+        completed.notification_text
+        == "Two отметил(а) <tg-spoiler>Интерстеллар</tg-spoiler> как завершённое. Хочешь поставить оценку?"
+    )
     assert completed.cat_notification_type is CatNotificationType.COMPLETED
     assert rating.score == 10
     assert rating.emoji == "🔥"
     assert items == [item]
     assert average_rating(items[0]) == 10
+
+
+@pytest.mark.asyncio
+async def test_content_not_acquainted_response_skips_numeric_rating_and_average() -> None:
+    service, creator, partner, _ = build_service()
+    item = await service.add_item(creator, category=ContentCategory.MOVIE, title="Интерстеллар")
+    await service.complete_item(creator, item.id)
+
+    response = await service.save_not_acquainted(partner, content_id=item.id)
+    context, items = await service.list_items(creator)
+    card = await service.build_content_card(context, items[0])
+
+    assert response.response == "NOT_ACQUAINTED"
+    assert response.score is None
+    assert response.emoji is None
+    assert average_rating(items[0]) is None
+    assert "🎬 Фильм <tg-spoiler>Интерстеллар</tg-spoiler>" in card
+    assert "Не знаком(а): Two" in card
+
+
+@pytest.mark.asyncio
+async def test_content_numeric_rating_replaces_not_acquainted_response() -> None:
+    service, creator, partner, _ = build_service()
+    item = await service.add_item(creator, category=ContentCategory.MOVIE, title="Интерстеллар")
+    await service.complete_item(creator, item.id)
+
+    await service.save_not_acquainted(partner, content_id=item.id)
+    rating = await service.save_rating(partner, content_id=item.id, score=8, emoji="🔥")
+
+    assert rating.response == "RATED"
+    assert rating.score == 8
+    assert rating.emoji == "🔥"
 
 
 @pytest.mark.asyncio
@@ -229,3 +288,13 @@ def test_apply_content_filter_excludes_unrated_items_from_rating_filters() -> No
     rated.ratings = [Rating(content_id=1, user_id=1, score=8, emoji=None)]
 
     assert apply_content_filter([rated, unrated], ContentListFilter(min_rating=8)) == [rated]
+
+
+def test_content_average_ignores_not_acquainted_responses() -> None:
+    item = ContentItem(id=1, title="A", category="MOVIE", added_by=1, status="COMPLETED")
+    item.ratings = [
+        Rating(content_id=1, user_id=1, score=8, emoji=None, response="RATED"),
+        Rating(content_id=1, user_id=2, score=None, emoji=None, response="NOT_ACQUAINTED"),
+    ]
+
+    assert average_rating(item) == 8

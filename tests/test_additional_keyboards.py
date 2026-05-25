@@ -12,7 +12,11 @@ from app.bot.keyboards.settings import (
     TOGGLE_REMINDERS_PAUSE_CALLBACK,
     build_settings_keyboard,
 )
-from app.bot.keyboards.statistics import build_statistics_keyboard
+from app.bot.keyboards.statistics import (
+    STATISTICS_MONTH_CALLBACK,
+    STATISTICS_WEEK_CALLBACK,
+    build_statistics_keyboard,
+)
 from app.services.chat_blocks import ADDITIONAL_BLOCK_KEY
 
 
@@ -35,6 +39,16 @@ def test_nested_additional_keyboards_close_the_additional_block() -> None:
 
     assert settings_buttons[-1].callback_data == close_block_callback(ADDITIONAL_BLOCK_KEY)
     assert statistics_buttons[-1].callback_data == close_block_callback(ADDITIONAL_BLOCK_KEY)
+
+
+def test_statistics_keyboard_hides_current_period_button() -> None:
+    week_buttons = extract_buttons(build_statistics_keyboard(current_period="week"))
+    month_buttons = extract_buttons(build_statistics_keyboard(current_period="month"))
+
+    assert STATISTICS_WEEK_CALLBACK not in [button.callback_data for button in week_buttons]
+    assert STATISTICS_MONTH_CALLBACK in [button.callback_data for button in week_buttons]
+    assert STATISTICS_WEEK_CALLBACK in [button.callback_data for button in month_buttons]
+    assert STATISTICS_MONTH_CALLBACK not in [button.callback_data for button in month_buttons]
 
 
 def test_settings_keyboard_contains_reminder_controls() -> None:

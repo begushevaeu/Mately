@@ -35,6 +35,7 @@ from app.services.places import (
     PlaceMutationResult,
     PlaceService,
     PlaceServiceError,
+    format_place_title_spoiler,
     place_summary_counts,
 )
 
@@ -98,6 +99,7 @@ async def send_place_notification(bot: Bot, result: PlaceMutationResult) -> None
         result.notification_text,
         theme=result.cozy_theme,
         subject=result.cozy_subject,
+        escape_suffix=True,
     )
     await send_user_notification(
         bot,
@@ -105,6 +107,7 @@ async def send_place_notification(bot: Bot, result: PlaceMutationResult) -> None
         notification_text,
         cat_notification_type=result.cat_notification_type,
         reply_markup=build_place_notification_keyboard(result.item.id),
+        parse_mode="HTML",
     )
 
 
@@ -325,7 +328,7 @@ async def handle_place_title(message: Message, state: FSMContext, session: Async
     await edit_places_panel_from_state(
         bot,
         state,
-        f"✅ <b>Добавлено:</b> {escape(item.title)}\n\n{text}",
+        f"✅ <b>Добавлено:</b> {format_place_title_spoiler(item)}\n\n{text}",
         keyboard,
     )
     await state.clear()
@@ -370,7 +373,7 @@ async def handle_visit_place(callback: CallbackQuery, state: FSMContext, session
     await state.set_state(PlaceStates.choosing_rating)
     await edit_places_panel(
         callback.message,
-        f"✅ <b>Посетили:</b> {escape(item.title)}\n\nПоставь оценку от 1 до 10.",
+        f"✅ <b>Посетили:</b> {format_place_title_spoiler(item)}\n\nПоставь оценку от 1 до 10.",
         build_place_rating_keyboard(item.id),
     )
     await callback.answer()

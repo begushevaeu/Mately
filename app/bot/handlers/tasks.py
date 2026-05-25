@@ -77,6 +77,10 @@ DEADLINE_BY_CALLBACK = {
 }
 
 
+def format_task_creation_step(title: str, prompt: str) -> str:
+    return f"➕ <b>Добавить задачу</b>\n\n<blockquote>{escape(title)}</blockquote>\n\n{prompt}"
+
+
 async def get_current_result_for_callback(callback: CallbackQuery, session: AsyncSession) -> OnboardingResult:
     profile = TelegramUserProfile(
         telegram_id=callback.from_user.id,
@@ -117,6 +121,7 @@ async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
         result.notification_text,
         theme=result.cozy_theme,
         subject=result.cozy_subject,
+        escape_suffix=True,
     )
     cat_asset = select_cat_asset(result.cat_notification_type)
     try:
@@ -125,13 +130,14 @@ async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
                 result.notification_user.telegram_id,
                 FSInputFile(cat_asset),
                 caption=notification_text,
+                parse_mode="HTML",
             )
             return
     except TelegramAPIError:
         logger.exception("Failed to send task notification photo")
 
     try:
-        await bot.send_message(result.notification_user.telegram_id, notification_text)
+        await bot.send_message(result.notification_user.telegram_id, notification_text, parse_mode="HTML")
     except TelegramAPIError:
         logger.exception("Failed to send task notification")
 
@@ -364,7 +370,7 @@ async def handle_task_title(message: Message, state: FSMContext, session: AsyncS
     await edit_task_panel_from_state(
         bot,
         state,
-        f"➕ <b>{escape(title)}</b>\n\nЭто разовая или регулярная задача?",
+        format_task_creation_step(title, "Это разовая или регулярная задача?"),
         build_recurring_choice_keyboard(),
     )
 
@@ -395,7 +401,7 @@ async def handle_task_recurring_choice(callback: CallbackQuery, state: FSMContex
         partner_button = await get_partner_assignment_button(session, result)
         await edit_task_panel_message(
             callback.message,
-            f"➕ <b>{escape(title)}</b>\n\nКому назначить задачу?",
+            format_task_creation_step(title, "Кому назначить задачу?"),
             build_assignment_keyboard(partner_button),
         )
         await callback.answer()
@@ -405,7 +411,7 @@ async def handle_task_recurring_choice(callback: CallbackQuery, state: FSMContex
     await state.set_state(TaskCreationStates.choosing_recurrence)
     await edit_task_panel_message(
         callback.message,
-        f"➕ <b>{escape(title)}</b>\n\nКак часто повторять?",
+        format_task_creation_step(title, "Как часто повторять?"),
         build_recurrence_keyboard(),
     )
     await callback.answer()
@@ -426,7 +432,7 @@ async def handle_task_recurrence(callback: CallbackQuery, state: FSMContext, ses
         await state.set_state(TaskCreationStates.waiting_for_custom_interval)
         await edit_task_panel_message(
             callback.message,
-            f"➕ <b>{escape(title)}</b>\n\nЧерез сколько дней повторять? Напиши число от 1 до 365.",
+            format_task_creation_step(title, "Через сколько дней повторять? Напиши число от 1 до 365."),
             build_task_creation_cancel_keyboard(),
         )
         await callback.answer()
@@ -436,7 +442,7 @@ async def handle_task_recurrence(callback: CallbackQuery, state: FSMContext, ses
     partner_button = await get_partner_assignment_button(session, result)
     await edit_task_panel_message(
         callback.message,
-        f"➕ <b>{escape(title)}</b>\n\nКому назначить задачу?",
+        format_task_creation_step(title, "Кому назначить задачу?"),
         build_assignment_keyboard(partner_button),
     )
     await callback.answer()
@@ -458,7 +464,7 @@ async def handle_task_custom_interval(message: Message, state: FSMContext, sessi
         await edit_task_panel_from_state(
             bot,
             state,
-            f"➕ <b>{escape(title)}</b>\n\nНапиши число дней от 1 до 365.",
+            format_task_creation_step(title, "Напиши число дней от 1 до 365."),
             build_task_creation_cancel_keyboard(),
         )
         return
@@ -469,7 +475,7 @@ async def handle_task_custom_interval(message: Message, state: FSMContext, sessi
     await edit_task_panel_from_state(
         bot,
         state,
-        f"➕ <b>{escape(title)}</b>\n\nКому назначить задачу?",
+        format_task_creation_step(title, "Кому назначить задачу?"),
         build_assignment_keyboard(partner_button),
     )
 
@@ -489,7 +495,10 @@ async def handle_task_assignment(callback: CallbackQuery, state: FSMContext, ses
     await state.set_state(TaskCreationStates.waiting_for_deadline)
     await edit_task_panel_message(
         callback.message,
-        f"➕ <b>{escape(title)}</b>\n\nКогда выполнить? Можно выбрать кнопку или написать дату в формате ДД.ММ.ГГГГ.",
+        format_task_creation_step(
+            title,
+            "Когда выполнить? Можно выбрать кнопку или написать дату в формате ДД.ММ.ГГГГ.",
+        ),
         build_deadline_keyboard(),
     )
     await callback.answer()
@@ -542,14 +551,14 @@ async def handle_task_inline_step_text(message: Message, state: FSMContext, sess
     current_state = await state.get_state()
 
     if current_state == TaskCreationStates.choosing_recurring.state:
-        text = f"➕ <b>{escape(title)}</b>\n\nВыбери тип задачи кнопкой в панели."
+        text = format_task_creation_step(title, "Выбери тип задачи кнопкой в панели.")
         keyboard = build_recurring_choice_keyboard()
     elif current_state == TaskCreationStates.choosing_recurrence.state:
-        text = f"➕ <b>{escape(title)}</b>\n\nВыбери периодичность кнопкой в панели."
+        text = format_task_creation_step(title, "Выбери периодичность кнопкой в панели.")
         keyboard = build_recurrence_keyboard()
     else:
         partner_button = await get_partner_assignment_button(session, result)
-        text = f"➕ <b>{escape(title)}</b>\n\nВыбери назначение кнопкой в панели."
+        text = format_task_creation_step(title, "Выбери назначение кнопкой в панели.")
         keyboard = build_assignment_keyboard(partner_button)
 
     await edit_task_panel_from_state(bot, state, text, keyboard)

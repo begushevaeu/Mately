@@ -1,0 +1,589 @@
+# Progress Log
+
+2026-05-25 18:22 +03:00 MAT-101 Claim
+------------------------------------
+Task: MAT-101 - Choose production target and release checklist.
+
+Claim:
+- assignee: codex
+- intent: Prepare the production target decision and release checklist.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 18:47 +03:00 MAT-101 Done
+-----------------------------------
+Task: MAT-101 - Choose production target and release checklist.
+
+Done:
+- Selected VPS deployment target and added production compose, env example, deployment checklist, URL normalization, and deployment tests.
+
+Verification:
+- python -m pytest tests/test_deployment_config.py tests/test_project_bootstrap.py
+- python -m taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-109 - Plan multi-couple data isolation
+
+2026-05-25 18:47 +03:00 MAT-102 Blocked
+--------------------------------------
+Task: MAT-102 - Finalize production deployment.
+
+Blocked:
+- VPS target is chosen, but noninteractive SSH deploy needs key-based root access. Password must not be embedded in commands or files; add an SSH public key or run the first login step manually.
+
+Verification:
+- ssh BatchMode check reached server and returned publickey/password required
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 19:02 +03:00 MAT-102 Released
+---------------------------------------
+Task: MAT-102 - Finalize production deployment.
+
+Released:
+- SSH key access to VPS has been confirmed.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 19:02 +03:00 MAT-102 Claim
+------------------------------------
+Task: MAT-102 - Finalize production deployment.
+
+Claim:
+- assignee: codex
+- intent: Deploy Mately to the VPS with Docker Compose production configuration.
+- assumption: SSH key auth works for root@185.103.103.129
+
+Coordination Context:
+- worktree: 14 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 19:16 +03:00 MAT-102 Done
+-----------------------------------
+Task: MAT-102 - Finalize production deployment.
+
+Done:
+- Deployed Mately to VPS at 185.103.103.129 with production Docker Compose, private PostgreSQL, migrations, and single polling bot.
+
+Verification:
+- VPS docker compose ps: bot up, db healthy
+- Production alembic_version: 0005_places_show_category
+- Bot logs: Start polling for @mately_bot
+- python -m pytest tests/test_deployment_config.py tests/test_project_bootstrap.py
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-109 - Plan multi-couple data isolation
+
+2026-05-25 19:27 +03:00 MAT-109 Claim
+------------------------------------
+Task: MAT-109 - Plan multi-couple data isolation.
+
+Claim:
+- assignee: codex
+- intent: Design the multi-couple data isolation migration and rollout plan.
+
+Coordination Context:
+- worktree: 14 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 19:29 +03:00 MAT-109 Done
+-----------------------------------
+Task: MAT-109 - Plan multi-couple data isolation.
+
+Done:
+- Created a concrete multi-couple data isolation plan covering schema, migrations, repositories, services, schedulers, analytics, tests, rollout, and MAT-112 definition of done.
+
+Verification:
+- python -m taskos validate
+- python -m pytest tests/test_database_models.py tests/test_task_service.py tests/test_shopping_service.py tests/test_content_service.py tests/test_places_service.py tests/test_scheduler_system.py tests/test_analytics_recaps.py
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-112 - Implement multi-couple data isolation
+
+2026-05-25 19:37 +03:00 MAT-112 Claim
+------------------------------------
+Task: MAT-112 - Implement multi-couple data isolation.
+
+Claim:
+- assignee: codex
+- intent: Implement explicit couple_id data isolation across shared entities.
+- assumption: MAT-109 plan is the source of implementation scope.
+
+Coordination Context:
+- worktree: 14 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 19:49 +03:00 MAT-112 Done
+-----------------------------------
+Task: MAT-112 - Implement multi-couple data isolation.
+
+Done:
+- Added explicit couple_id scoping for tasks, shopping, content, places, and notifications, including migration and service/repository isolation checks.
+
+Verification:
+- python -m pytest
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-113 - Normalize notification rules across all blocks
+
+2026-05-25 20:21 +03:00 MAT-113 Claim
+------------------------------------
+Task: MAT-113 - Normalize notification rules across all blocks.
+
+Claim:
+- assignee: codex
+- intent: Normalize notification rules across bot blocks with user-confirmed logic.
+- assumption: User wants block-by-block notification logic clarified before implementation.
+
+Coordination Context:
+- worktree: 36 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 20:22 +03:00 MAT-113 Blocked
+--------------------------------------
+Task: MAT-113 - Normalize notification rules across all blocks.
+
+Blocked:
+- Waiting for user-confirmed notification matrix: block-by-block send/skip, recipient, dedupe, tone, and fallback rules are product decisions.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 21:06 +03:00 MAT-113 Done
+-----------------------------------
+Task: MAT-113 - Normalize notification rules across all blocks.
+
+Done:
+- Documented the agreed notification matrix and updated dependent tasks to reference docs/notification-matrix.md.
+
+Verification:
+- python -m taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-103 - Add reminder controls and quiet-hour settings
+
+2026-05-25 21:11 +03:00 MAT-103 Claim
+------------------------------------
+Task: MAT-103 - Add reminder controls and quiet-hour settings.
+
+Claim:
+- assignee: codex
+- intent: Add couple reminder controls and align scheduled notifications with notification matrix.
+- assumption: Use docs/notification-matrix.md as the source of product rules.
+
+Coordination Context:
+- worktree: 36 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 21:36 +03:00 MAT-103 Done
+-----------------------------------
+Task: MAT-103 - Add reminder controls and quiet-hour settings.
+
+Done:
+- Added couple-level reminder settings with Telegram controls for morning/evening enablement, custom times, pause mode, and scheduler integration that disables proactive recap sends.
+
+Verification:
+- python -m pytest
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-104 - Notify partner about shopping changes
+
+2026-05-25 21:58 +03:00 MAT-104 Claim
+------------------------------------
+Task: MAT-104 - Notify partner about shopping changes.
+
+Claim:
+- assignee: codex
+- intent: Notify partner when shopping items are added or marked bought according to the notification matrix.
+- assumption: Shopping notifications are plain text only, sent to the partner, without cat media or AI suffixes.
+
+Coordination Context:
+- worktree: 8 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 22:01 +03:00 MAT-114 Claim
+------------------------------------
+Task: MAT-114 - Add 09:00 morning cleanup and task digest.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- already in progress: MAT-104 - Notify partner about shopping changes. Parallel claims are allowed; avoid overlapping files.
+- worktree: 8 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 22:03 +03:00 MAT-104 Done
+-----------------------------------
+Task: MAT-104 - Notify partner about shopping changes.
+
+Done:
+- Added partner notifications for shopping items when added or marked bought, with partner aliases and plain text delivery.
+
+Verification:
+- python -m pytest
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-115 - Fix statistics period buttons
+
+2026-05-25 22:19 +03:00 MAT-114 Done
+-----------------------------------
+Task: MAT-114 - Add 09:00 morning cleanup and task digest.
+
+Done:
+- Added 09:00 stale bot-message cleanup and replaced the morning reminder with an unfinished-task digest.
+
+Verification:
+- python -m pytest tests/test_scheduler_system.py tests/test_main_menu_handlers.py tests/test_task_service.py; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-115 - Fix statistics period buttons
+
+2026-05-25 22:26 +03:00 MAT-115 Claim
+------------------------------------
+Task: MAT-115 - Fix statistics period buttons.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 16 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 22:28 +03:00 MAT-115 Done
+-----------------------------------
+Task: MAT-115 - Fix statistics period buttons.
+
+Done:
+- Statistics keyboards now hide the currently selected period button while preserving navigation back to Additional.
+
+Verification:
+- python -m pytest tests/test_analytics_recaps.py tests/test_additional_keyboards.py tests/test_main_menu_handlers.py; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-116 - Use selected category in add buttons
+
+2026-05-25 22:36 +03:00 MAT-116 Claim
+------------------------------------
+Task: MAT-116 - Use selected category in add buttons.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 19 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 22:39 +03:00 MAT-116 Done
+-----------------------------------
+Task: MAT-116 - Use selected category in add buttons.
+
+Done:
+- Content and Places add-category buttons now include the selected Russian category label, and the title prompt repeats that selected category.
+
+Verification:
+- python -m pytest tests/test_content_keyboards.py tests/test_places_keyboards.py tests/test_content_service.py tests/test_places_service.py; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-117 - Add not-acquainted response for partner ratings
+
+2026-05-25 23:28 +03:00 MAT-117 Claim
+------------------------------------
+Task: MAT-117 - Add not-acquainted response for partner ratings.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 14 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 23:50 +03:00 MAT-117 Done
+-----------------------------------
+Task: MAT-117 - Add not-acquainted response for partner ratings.
+
+Done:
+- Added non-numeric not-acquainted responses for completed content and visited places.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-105 - Notify partner when a place is visited
+
+2026-05-25 23:52 +03:00 MAT-105 Claim
+------------------------------------
+Task: MAT-105 - Notify partner when a place is visited.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 31 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-25 23:56 +03:00 MAT-105 Done
+-----------------------------------
+Task: MAT-105 - Notify partner when a place is visited.
+
+Done:
+- Added partner notification when a place is marked visited, with rating and not-visited actions.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-118 - Remove Filter from the Content menu
+
+2026-05-26 00:21 +03:00 MAT-118 Claim
+------------------------------------
+Task: MAT-118 - Remove Filter from the Content menu.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 20 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:22 +03:00 MAT-118 Done
+-----------------------------------
+Task: MAT-118 - Remove Filter from the Content menu.
+
+Done:
+- Removed the Filter button from the main Content menu while keeping legacy filter callbacks available.
+
+Verification:
+- python -m pytest tests/test_content_keyboards.py tests/test_content_service.py; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-121 - Bold the partner invite code
+
+2026-05-26 00:23 +03:00 MAT-121 Claim
+------------------------------------
+Task: MAT-121 - Bold the partner invite code.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 21 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:24 +03:00 MAT-121 Done
+-----------------------------------
+Task: MAT-121 - Bold the partner invite code.
+
+Done:
+- Bolded only the partner invite code in the waiting-for-partner onboarding message.
+
+Verification:
+- python -m pytest tests/test_onboarding_handlers.py tests/test_couple_service.py; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-122 - Prompt couple creator to name the joined partner
+
+2026-05-26 00:24 +03:00 MAT-122 Claim
+------------------------------------
+Task: MAT-122 - Prompt couple creator to name the joined partner.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 23 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:28 +03:00 MAT-122 Done
+-----------------------------------
+Task: MAT-122 - Prompt couple creator to name the joined partner.
+
+Done:
+- Prompted the original couple creator to set an alias for the joined partner after a successful invite-code join.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-123 - Render task text as Quote
+
+2026-05-26 00:29 +03:00 MAT-123 Claim
+------------------------------------
+Task: MAT-123 - Render task text as Quote.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 25 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:35 +03:00 MAT-123 Done
+-----------------------------------
+Task: MAT-123 - Render task text as Quote.
+
+Done:
+- Task titles now render as Telegram HTML blockquotes in task cards, creation panels, and task notifications while metadata stays outside the quote.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-124 - Render content and place titles as Spoiler
+
+2026-05-26 00:41 +03:00 MAT-124 Claim
+------------------------------------
+Task: MAT-124 - Render content and place titles as Spoiler.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 31 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:44 +03:00 MAT-124 Done
+-----------------------------------
+Task: MAT-124 - Render content and place titles as Spoiler.
+
+Done:
+- Content and place titles now render as Telegram HTML spoilers in cards, list panels, action confirmations, and partner notifications while surrounding metadata remains readable.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-125 - Allow deleting completed-task notifications

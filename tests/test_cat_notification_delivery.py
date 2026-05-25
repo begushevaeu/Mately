@@ -47,6 +47,7 @@ async def test_task_notification_sends_cat_photo_when_asset_exists(
     assert bot.photos[0]["chat_id"] == 200
     assert Path(str(bot.photos[0]["photo"].path)) == cat_asset
     assert bot.photos[0]["caption"] == "Готово."
+    assert bot.photos[0]["parse_mode"] == "HTML"
 
 
 @pytest.mark.asyncio
@@ -57,4 +58,4 @@ async def test_task_notification_falls_back_to_text_when_asset_is_missing(monkey
     await task_handlers.send_task_notification(bot, build_task_result())
 
     assert bot.photos == []
-    assert bot.messages == [{"chat_id": 200, "text": "Готово."}]
+    assert bot.messages == [{"chat_id": 200, "text": "Готово.", "parse_mode": "HTML"}]

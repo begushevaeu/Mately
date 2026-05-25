@@ -21,6 +21,12 @@ The repository is initialized with the project structure from `docs/mately_step_
    pip install -e .
    ```
 
+   For local development with tests and TaskOS:
+
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
 3. Copy `.env.example` values into `.env` and fill `BOT_TOKEN`.
 4. Start PostgreSQL with Docker Compose:
 
@@ -48,6 +54,23 @@ docker compose run --rm bot python -m alembic upgrade head
 
 The Docker bot container runs migrations automatically on startup when `RUN_MIGRATIONS=true`.
 
+## TaskOS Workflow
+
+This repository includes Codex TaskOS for implementation planning. `tasks.json` is the source of truth, `progress.txt` keeps the work log, and the generated views live in `docs/kanban.md` and `docs/task-board.html`.
+The human-readable roadmap lives in `ROADMAP.md`.
+
+Useful commands:
+
+```bash
+taskos doctor
+taskos ready
+taskos claim
+taskos done TASK-001 --summary "Implemented the task." --check "python -m pytest"
+taskos sync
+```
+
+Do not edit the generated kanban or dashboard directly; change `tasks.json` or use the TaskOS commands and run `taskos sync`.
+
 ## Required Environment Variables
 
 - `BOT_TOKEN` - Telegram bot token from BotFather.
@@ -63,8 +86,8 @@ The Docker bot container runs migrations automatically on startup when `RUN_MIGR
 
 The MVP is deployment-ready as a single polling bot process with PostgreSQL:
 
-- Railway/Render: deploy from the Dockerfile, attach a PostgreSQL database, set the env vars above, and keep `RUN_MIGRATIONS=true`.
-- VPS: use Docker Compose, keep `.env` outside Git, and run `docker compose up -d --build`.
+- VPS: use `docker-compose.prod.yml`, keep `.env.production` outside Git, and run `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build`.
+- Full checklist: see `DEPLOYMENT.md`.
 - Do not run more than one polling bot instance for the same token at the same time.
 
 ## Architecture Guardrails

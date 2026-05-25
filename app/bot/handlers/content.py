@@ -48,6 +48,7 @@ from app.services.content import (
     ContentServiceError,
     completed_since_for_period,
     content_summary_counts,
+    format_content_title_spoiler,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 
@@ -162,6 +163,7 @@ async def send_content_notification(bot: Bot, result: ContentMutationResult) -> 
         result.notification_text,
         theme=result.cozy_theme,
         subject=result.cozy_subject,
+        escape_suffix=True,
     )
     cat_asset = select_cat_asset(result.cat_notification_type)
     reply_markup = build_content_notification_keyboard(result.item.id)
@@ -172,6 +174,7 @@ async def send_content_notification(bot: Bot, result: ContentMutationResult) -> 
                 FSInputFile(cat_asset),
                 caption=notification_text,
                 reply_markup=reply_markup,
+                parse_mode="HTML",
             )
             return
     except TelegramAPIError:
@@ -182,6 +185,7 @@ async def send_content_notification(bot: Bot, result: ContentMutationResult) -> 
             result.notification_user.telegram_id,
             notification_text,
             reply_markup=reply_markup,
+            parse_mode="HTML",
         )
     except TelegramAPIError:
         logger.exception("Failed to send content notification")
@@ -353,7 +357,7 @@ async def handle_content_title(message: Message, state: FSMContext, session: Asy
     await edit_content_panel_from_state(
         bot,
         state,
-        f"✅ <b>Добавлено:</b> {escape(item.title)}\n\n{text}",
+        f"✅ <b>Добавлено:</b> {format_content_title_spoiler(item)}\n\n{text}",
         keyboard,
     )
     await state.clear()
@@ -501,7 +505,8 @@ async def handle_complete_content(callback: CallbackQuery, state: FSMContext, se
     await state.set_state(ContentStates.choosing_rating)
     await edit_content_panel(
         callback.message,
-        f"✅ <b>Завершено:</b> {escape(mutation_result.item.title)}\n\nПоставь оценку от 1 до 10.",
+        f"✅ <b>Завершено:</b> {format_content_title_spoiler(mutation_result.item)}\n\n"
+        "Поставь оценку от 1 до 10.",
         build_content_rating_keyboard(mutation_result.item.id),
     )
     await callback.answer()

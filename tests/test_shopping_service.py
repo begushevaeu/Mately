@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.models import Couple, CoupleMember, ShoppingItem, User
+from app.models import Couple, CoupleMember, PartnerAlias, ShoppingItem, User
 from app.services.shopping import ShoppingService, ShoppingServiceError, build_shopping_panel_text, start_of_today_utc
 
 
@@ -79,7 +79,22 @@ class FakeShoppingRepository:
         return archived_count
 
 
-def build_service() -> tuple[ShoppingService, User, User, FakeShoppingRepository]:
+@dataclass(slots=True)
+class FakePartnerAliasRepository:
+    aliases: dict[tuple[int, int], PartnerAlias] = field(default_factory=dict)
+
+    async def get(self, owner_user_id: int, partner_user_id: int):
+        return self.aliases.get((owner_user_id, partner_user_id))
+
+    async def upsert(self, **kwargs):
+        alias = PartnerAlias(**kwargs)
+        self.aliases[(kwargs["owner_user_id"], kwargs["partner_user_id"])] = alias
+        return alias
+
+
+def build_service(
+    alias_repository: FakePartnerAliasRepository | None = None,
+) -> tuple[ShoppingService, User, User, FakeShoppingRepository]:
     creator = User(id=1, telegram_id=100, username="one", first_name="One")
     partner = User(id=2, telegram_id=200, username="two", first_name="Two")
     couple = Couple(id=1, invite_code="ABC12345", timezone="Europe/Moscow")
@@ -87,6 +102,7 @@ def build_service() -> tuple[ShoppingService, User, User, FakeShoppingRepository
     service = ShoppingService(
         couples=FakeCoupleRepository(couple=couple, members=[creator, partner]),
         shopping=shopping_repository,
+        aliases=alias_repository or FakePartnerAliasRepository(),
     )
     return service, creator, partner, shopping_repository
 
@@ -95,22 +111,28 @@ def build_service() -> tuple[ShoppingService, User, User, FakeShoppingRepository
 async def test_shopping_item_can_be_added_and_marked_bought() -> None:
     service, creator, partner, _ = build_service()
 
-    item = await service.add_item(creator, "Молоко")
+    added = await service.add_item(creator, "Молоко")
+    item = added.item
     _, active_items = await service.list_items(partner)
-    bought = await service.mark_bought(partner, item.id)
+    bought_result = await service.mark_bought(partner, item.id)
+    bought = bought_result.item
     _, visible_items = await service.list_items(creator)
 
     assert active_items == [item]
+    assert added.notification_user is partner
+    assert added.notification_text == "One добавил(а) в покупки «Молоко»."
     assert bought.status == "BOUGHT"
     assert bought.completed_by == partner.id
+    assert bought_result.notification_user is creator
+    assert bought_result.notification_text == "Two отметил(а) купленным «Молоко»."
     assert visible_items == [bought]
 
 
 @pytest.mark.asyncio
 async def test_bought_items_are_archived_after_local_midnight() -> None:
     service, creator, partner, shopping_repository = build_service()
-    old_item = await service.add_item(creator, "Хлеб")
-    fresh_item = await service.add_item(creator, "Сыр")
+    old_item = (await service.add_item(creator, "Хлеб")).item
+    fresh_item = (await service.add_item(creator, "Сыр")).item
     old_item.status = "BOUGHT"
     old_item.completed_by = partner.id
     old_item.completed_at = datetime(2026, 5, 19, 18, 0, tzinfo=timezone.utc)
@@ -147,6 +169,25 @@ async def test_shopping_item_from_another_couple_is_hidden() -> None:
     assert visible_items == []
     with pytest.raises(ShoppingServiceError):
         await service.mark_bought(creator, 99)
+
+
+@pytest.mark.asyncio
+async def test_partner_aliases_are_used_in_shopping_notifications() -> None:
+    aliases = FakePartnerAliasRepository()
+    service, creator, partner, _ = build_service(aliases)
+    await aliases.upsert(
+        owner_user_id=partner.id,
+        partner_user_id=creator.id,
+        emoji="🐵",
+        nominative="Обезьянка",
+        genitive="Обезьянки",
+        dative="Обезьянке",
+    )
+
+    result = await service.add_item(creator, "Кофе")
+
+    assert result.notification_user is partner
+    assert result.notification_text == "🐵Обезьянка добавил(а) в покупки «Кофе»."
 
 
 def test_start_of_today_utc_uses_couple_timezone() -> None:

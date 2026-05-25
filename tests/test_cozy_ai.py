@@ -66,6 +66,22 @@ async def test_append_cozy_suffix_keeps_plain_notifications_when_theme_is_absent
     assert text == "Готово."
 
 
+@pytest.mark.asyncio
+async def test_append_cozy_suffix_can_escape_html_for_markup_notifications() -> None:
+    class FakeGenerator:
+        async def generate(self, *_args, **_kwargs) -> str:
+            return "Sage <3 & дом"
+
+    text = await append_cozy_suffix(
+        "<b>Готово.</b>",
+        theme=CozyMessageTheme.TASK_COMPLETED,
+        generator=FakeGenerator(),
+        escape_suffix=True,
+    )
+
+    assert text == "<b>Готово.</b>\n\nSage &lt;3 &amp; дом"
+
+
 def test_sanitize_cozy_message_limits_length() -> None:
     long_message = " ".join(["котик"] * 80)
 

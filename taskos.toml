@@ -1,0 +1,9 @@
+project_name = "Mately"
+tasks_file = "tasks.json"
+progress_file = "progress.txt"
+lock_file = ".taskos.lock"
+generated_kanban = "docs/kanban.md"
+generated_dashboard = "docs/task-board.html"
+canonical_docs = ["README.md", "ROADMAP.md", "docs/mately_description.md.txt", "docs/mately_step_by_step.md.txt"]
+priority_order = ["P0", "P1", "P2", "P3"]
+command_name = "taskos"

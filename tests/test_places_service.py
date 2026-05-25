@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models import Couple, CoupleMember, PartnerAlias, PlaceComment, PlaceItem, PlaceRating, User
+from app.notifications.cats import CatNotificationType
+from app.ai.cozy import CozyMessageTheme
 from app.services.places import (
     PlaceCategory,
     PlaceListFilter,
@@ -86,11 +88,38 @@ class FakePlaceRepository:
             None,
         )
         if rating is None:
-            rating = PlaceRating(id=self.next_rating_id, place_id=place_id, user_id=user_id, score=score)
+            rating = PlaceRating(
+                id=self.next_rating_id,
+                place_id=place_id,
+                user_id=user_id,
+                score=score,
+                response="RATED",
+            )
             self.next_rating_id += 1
             self.ratings.append(rating)
         else:
             rating.score = score
+            rating.response = "RATED"
+        return rating
+
+    async def upsert_not_acquainted(self, *, place_id: int, user_id: int) -> PlaceRating:
+        rating = next(
+            (rating for rating in self.ratings if rating.place_id == place_id and rating.user_id == user_id),
+            None,
+        )
+        if rating is None:
+            rating = PlaceRating(
+                id=self.next_rating_id,
+                place_id=place_id,
+                user_id=user_id,
+                score=None,
+                response="NOT_ACQUAINTED",
+            )
+            self.next_rating_id += 1
+            self.ratings.append(rating)
+        else:
+            rating.score = None
+            rating.response = "NOT_ACQUAINTED"
         return rating
 
     async def add_comment(self, *, place_id: int, user_id: int, text: str) -> PlaceComment:
@@ -113,8 +142,15 @@ class FakePartnerAliasRepository:
     async def get(self, owner_user_id: int, partner_user_id: int):
         return self.aliases.get((owner_user_id, partner_user_id))
 
+    async def upsert(self, **kwargs):
+        alias = PartnerAlias(**kwargs)
+        self.aliases[(kwargs["owner_user_id"], kwargs["partner_user_id"])] = alias
+        return alias
 
-def build_service() -> tuple[PlaceService, User, User, FakePlaceRepository]:
+
+def build_service(
+    alias_repository: FakePartnerAliasRepository | None = None,
+) -> tuple[PlaceService, User, User, FakePlaceRepository]:
     creator = User(id=1, telegram_id=100, username="one", first_name="One")
     partner = User(id=2, telegram_id=200, username="two", first_name="Two")
     couple = Couple(id=1, invite_code="ABC12345", timezone="Europe/Moscow")
@@ -122,7 +158,7 @@ def build_service() -> tuple[PlaceService, User, User, FakePlaceRepository]:
     service = PlaceService(
         couples=FakeCoupleRepository(couple=couple, members=[creator, partner]),
         places=place_repository,
-        aliases=FakePartnerAliasRepository(),
+        aliases=alias_repository or FakePartnerAliasRepository(),
     )
     return service, creator, partner, place_repository
 
@@ -132,7 +168,8 @@ async def test_place_can_be_added_visited_rated_and_commented() -> None:
     service, creator, partner, _ = build_service()
 
     item = await service.add_item(creator, category=PlaceCategory.RESTAURANT, title="  Sage <3  ")
-    visited = await service.visit_item(partner, item.id)
+    visited_result = await service.visit_item(partner, item.id)
+    visited = visited_result.item
     rating = await service.save_rating(partner, place_id=item.id, score=9)
     comment = await service.add_comment(partner, place_id=item.id, text=" Очень вкусно ")
     context, items = await service.list_items(creator)
@@ -141,11 +178,72 @@ async def test_place_can_be_added_visited_rated_and_commented() -> None:
     assert item.title == "Sage <3"
     assert visited.status == "VISITED"
     assert visited.visited_by == partner.id
+    assert visited_result.notification_user is creator
+    assert (
+        visited_result.notification_text
+        == "Two отметил(а) <tg-spoiler>Sage &lt;3</tg-spoiler> как посещённое. "
+        "Поставь оценку или нажми «Не был(а)»."
+    )
+    assert visited_result.cozy_theme is CozyMessageTheme.PLACE_VISITED
+    assert visited_result.cat_notification_type is CatNotificationType.COMPLETED
     assert rating.score == 9
     assert comment.text == "Очень вкусно"
     assert average_rating(items[0]) == 9
-    assert "Sage &lt;3" in card
+    assert "🍽️ Ресторан <tg-spoiler>Sage &lt;3</tg-spoiler>" in card
     assert "Комментарии:" in card
+
+
+@pytest.mark.asyncio
+async def test_place_not_acquainted_response_skips_numeric_rating_and_average() -> None:
+    service, creator, partner, _ = build_service()
+    item = await service.add_item(creator, category=PlaceCategory.RESTAURANT, title="Sage")
+    await service.visit_item(creator, item.id)
+
+    response = await service.save_not_acquainted(partner, place_id=item.id)
+    context, items = await service.list_items(creator)
+    card = await service.build_place_card(context, items[0])
+
+    assert response.response == "NOT_ACQUAINTED"
+    assert response.score is None
+    assert average_rating(items[0]) is None
+    assert "Не был(а): Two" in card
+
+
+@pytest.mark.asyncio
+async def test_place_numeric_rating_replaces_not_acquainted_response() -> None:
+    service, creator, partner, _ = build_service()
+    item = await service.add_item(creator, category=PlaceCategory.RESTAURANT, title="Sage")
+    await service.visit_item(creator, item.id)
+
+    await service.save_not_acquainted(partner, place_id=item.id)
+    rating = await service.save_rating(partner, place_id=item.id, score=7)
+
+    assert rating.response == "RATED"
+    assert rating.score == 7
+
+
+@pytest.mark.asyncio
+async def test_partner_aliases_are_used_in_place_visit_notifications() -> None:
+    aliases = FakePartnerAliasRepository()
+    service, creator, partner, _ = build_service(aliases)
+    await aliases.upsert(
+        owner_user_id=creator.id,
+        partner_user_id=partner.id,
+        emoji="🥒",
+        nominative="Огурчик",
+        genitive="Огурчика",
+        dative="Огурчику",
+    )
+    item = await service.add_item(creator, category=PlaceCategory.PARK, title="Парк")
+
+    result = await service.visit_item(partner, item.id)
+
+    assert result.notification_user is creator
+    assert (
+        result.notification_text
+        == "🥒Огурчик отметил(а) <tg-spoiler>Парк</tg-spoiler> как посещённое. "
+        "Поставь оценку или нажми «Не был(а)»."
+    )
 
 
 @pytest.mark.asyncio
@@ -158,6 +256,9 @@ async def test_place_comment_and_rating_require_visit() -> None:
 
     with pytest.raises(PlaceServiceError):
         await service.add_comment(creator, place_id=item.id, text="Хочу сюда")
+
+    with pytest.raises(PlaceServiceError):
+        await service.save_not_acquainted(creator, place_id=item.id)
 
 
 @pytest.mark.asyncio
@@ -193,3 +294,13 @@ async def test_place_from_another_couple_is_hidden() -> None:
     assert items == []
     with pytest.raises(PlaceServiceError):
         await service.visit_item(creator, 99)
+
+
+def test_place_average_ignores_not_acquainted_responses() -> None:
+    item = PlaceItem(id=1, title="A", category="CAFE", added_by=1, status="VISITED")
+    item.ratings = [
+        PlaceRating(place_id=1, user_id=1, score=9, response="RATED"),
+        PlaceRating(place_id=1, user_id=2, score=None, response="NOT_ACQUAINTED"),
+    ]
+
+    assert average_rating(item) == 9

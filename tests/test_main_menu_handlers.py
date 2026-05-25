@@ -5,7 +5,13 @@ import pytest
 from app.bot.handlers import main_menu
 from app.bot.keyboards.blocks import close_block_callback
 from app.models import Couple, CoupleReminderSettings, User
-from app.services.chat_blocks import CONTENT_BLOCK_KEY, MENU_HINT_BLOCK_KEY, TASKS_BLOCK_KEY
+from app.services.chat_blocks import (
+    CONTENT_BLOCK_KEY,
+    MENU_HINT_BLOCK_KEY,
+    TASKS_BLOCK_KEY,
+    ChatBlockService,
+    bot_managed_block_key,
+)
 from app.services.couples import OnboardingResult, OnboardingStatus
 
 
@@ -78,6 +84,58 @@ class FakeChatBlockService:
 
     async def remember_messages(self, *, messages, **_) -> None:
         self.__class__.remembered_message_ids = [message.message_id for message in messages]
+
+
+class FakeAuthor:
+    def __init__(self, *, is_bot: bool) -> None:
+        self.is_bot = is_bot
+
+
+class FakeTrackedMessage(FakeMessage):
+    def __init__(self, message_id: int, *, is_bot: bool) -> None:
+        super().__init__(message_id=message_id)
+        self.from_user = FakeAuthor(is_bot=is_bot)
+
+
+class FakeChatBlockRepository:
+    def __init__(self) -> None:
+        self.message_ids_by_key: dict[tuple[int, int, str], list[int]] = {}
+
+    async def set_message_ids(self, *, user_id: int, chat_id: int, block_key: str, message_ids: list[int]):
+        self.message_ids_by_key[(user_id, chat_id, block_key)] = message_ids
+
+    async def add_message_ids(self, *, user_id: int, chat_id: int, block_key: str, message_ids: list[int]):
+        key = (user_id, chat_id, block_key)
+        self.message_ids_by_key[key] = list(dict.fromkeys([*self.message_ids_by_key.get(key, []), *message_ids]))
+
+    async def clear(self, *, user_id: int, chat_id: int, block_key: str) -> None:
+        self.message_ids_by_key[(user_id, chat_id, block_key)] = []
+
+
+@pytest.mark.asyncio
+async def test_chat_block_service_tracks_bot_managed_messages_separately() -> None:
+    repository = FakeChatBlockRepository()
+    service = ChatBlockService(blocks=repository)
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+
+    await service.remember_messages(
+        user=user,
+        chat_id=100,
+        block_key=TASKS_BLOCK_KEY,
+        messages=[
+            FakeTrackedMessage(message_id=42, is_bot=False),
+            FakeTrackedMessage(message_id=1000, is_bot=True),
+        ],
+    )
+    await service.add_messages(
+        user=user,
+        chat_id=100,
+        block_key=TASKS_BLOCK_KEY,
+        messages=[FakeTrackedMessage(message_id=43, is_bot=False)],
+    )
+
+    assert repository.message_ids_by_key[(1, 100, TASKS_BLOCK_KEY)] == [42, 1000, 43]
+    assert repository.message_ids_by_key[(1, 100, bot_managed_block_key(TASKS_BLOCK_KEY))] == [1000]
 
 
 @pytest.mark.asyncio

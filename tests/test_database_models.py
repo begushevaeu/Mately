@@ -78,9 +78,11 @@ def test_status_and_rating_check_constraints_are_declared() -> None:
     assert "ck_tasks_task_recurrence_interval_days_positive" in constraint_names("tasks", CheckConstraint)
     assert "ck_shopping_items_shopping_item_status" in constraint_names("shopping_items", CheckConstraint)
     assert "ck_content_items_content_item_status" in constraint_names("content_items", CheckConstraint)
-    assert "ck_ratings_rating_score_range" in constraint_names("ratings", CheckConstraint)
+    assert "ck_ratings_rating_response" in constraint_names("ratings", CheckConstraint)
+    assert "ck_ratings_rating_response_score" in constraint_names("ratings", CheckConstraint)
     assert "ck_place_items_place_item_status" in constraint_names("place_items", CheckConstraint)
-    assert "ck_place_ratings_place_rating_score_range" in constraint_names("place_ratings", CheckConstraint)
+    assert "ck_place_ratings_place_rating_response" in constraint_names("place_ratings", CheckConstraint)
+    assert "ck_place_ratings_place_rating_response_score" in constraint_names("place_ratings", CheckConstraint)
     assert "ck_notifications_notification_status" in constraint_names("notifications", CheckConstraint)
 
 
@@ -102,6 +104,18 @@ def test_shopping_and_notification_fields_support_required_flows() -> None:
     assert {"status", "scheduled_at", "delivered_at", "dedupe_key"}.issubset(notification_columns.keys())
     assert "ix_shopping_items_archived_at" in index_names("shopping_items")
     assert "ix_notifications_scheduled_at" in index_names("notifications")
+
+
+def test_rating_response_columns_allow_non_numeric_responses() -> None:
+    rating_columns = Base.metadata.tables["ratings"].columns
+    place_rating_columns = Base.metadata.tables["place_ratings"].columns
+
+    assert "response" in rating_columns
+    assert rating_columns["response"].nullable is False
+    assert rating_columns["score"].nullable is True
+    assert "response" in place_rating_columns
+    assert place_rating_columns["response"].nullable is False
+    assert place_rating_columns["score"].nullable is True
 
 
 def test_couple_reminder_settings_support_scheduler_controls() -> None:
