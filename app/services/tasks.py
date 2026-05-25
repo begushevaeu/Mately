@@ -220,6 +220,7 @@ class TaskService:
         status = "ASSIGNED" if assigned_to is not None else "OPEN"
         assigned_at = datetime.now(timezone.utc) if assigned_to is not None else None
         task = await self.tasks.create(
+            couple_id=context.couple.id,
             title=creation_input.title,
             created_by=current_user.id,
             assigned_to=assigned_to,
@@ -258,15 +259,15 @@ class TaskService:
 
     async def list_all_active(self, current_user: User) -> tuple[CoupleTaskContext, list[Task]]:
         context = await self.get_context(current_user)
-        return context, await self.tasks.list_active_for_users(context.member_ids)
+        return context, await self.tasks.list_active_for_couple(context.couple.id)
 
     async def list_my_tasks(self, current_user: User) -> tuple[CoupleTaskContext, list[Task]]:
         context = await self.get_context(current_user)
-        return context, await self.tasks.list_assigned_to_user(current_user.id)
+        return context, await self.tasks.list_assigned_to_user(context.couple.id, current_user.id)
 
     async def list_pool(self, current_user: User) -> tuple[CoupleTaskContext, list[Task]]:
         context = await self.get_context(current_user)
-        return context, await self.tasks.list_pool_for_users(context.member_ids)
+        return context, await self.tasks.list_pool_for_couple(context.couple.id)
 
     async def regenerate_due_recurring_tasks(
         self,
@@ -275,7 +276,7 @@ class TaskService:
         now: datetime | None = None,
     ) -> list[TaskMutationResult]:
         now = now or datetime.now(timezone.utc)
-        active_tasks = await self.tasks.list_active_for_users(context.member_ids)
+        active_tasks = await self.tasks.list_active_for_couple(context.couple.id)
         results = []
         for task in active_tasks:
             if not task.is_recurring or task.recurrence_type is None or task.deadline is None:
@@ -383,12 +384,8 @@ class TaskService:
         return None
 
     async def _get_scoped_task(self, context: CoupleTaskContext, task_id: int) -> Task:
-        task = await self.tasks.get_by_id(task_id)
+        task = await self.tasks.get_by_id(task_id, context.couple.id)
         if task is None:
-            raise TaskServiceError("Task not found")
-
-        belongs_to_couple = task.created_by in context.member_ids or task.assigned_to in context.member_ids
-        if not belongs_to_couple:
             raise TaskServiceError("Task not found")
 
         return task
@@ -408,6 +405,7 @@ class TaskService:
 
         assigned_at = datetime.now(timezone.utc) if task.assigned_to is not None else None
         next_task = await self.tasks.create(
+            couple_id=context.couple.id,
             title=task.title,
             created_by=task.created_by,
             assigned_to=task.assigned_to,

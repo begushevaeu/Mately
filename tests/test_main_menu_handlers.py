@@ -4,7 +4,7 @@ import pytest
 
 from app.bot.handlers import main_menu
 from app.bot.keyboards.blocks import close_block_callback
-from app.models import Couple, User
+from app.models import Couple, CoupleReminderSettings, User
 from app.services.chat_blocks import CONTENT_BLOCK_KEY, MENU_HINT_BLOCK_KEY, TASKS_BLOCK_KEY
 from app.services.couples import OnboardingResult, OnboardingStatus
 
@@ -193,3 +193,23 @@ async def test_unknown_message_is_deleted_and_restores_reply_menu(monkeypatch: p
     assert FakeChatBlockService.remembered_message_ids == [1000]
     assert message.answers == ["Выбери раздел кнопкой ниже или нажми /menu."]
     assert "reply_markup" in message.answer_kwargs[0]
+
+
+def test_settings_panel_text_shows_reminder_state() -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+    couple = Couple(id=1, invite_code="ABC12345", timezone="Europe/Moscow")
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user, couple=couple)
+    settings = CoupleReminderSettings(
+        couple_id=1,
+        morning_enabled=True,
+        morning_time=datetime(2026, 1, 1, 8, 30).time(),
+        evening_enabled=False,
+        evening_time=datetime(2026, 1, 1, 22, 0).time(),
+        reminders_paused=True,
+    )
+
+    text = main_menu.build_settings_panel_text(result, settings)
+
+    assert "Утренний дайджест: включен, 08:30" in text
+    assert "Вечерняя сверка: выключена, 22:00" in text
+    assert "Пауза: включена" in text

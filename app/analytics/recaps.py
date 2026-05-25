@@ -55,16 +55,15 @@ class AnalyticsService:
         self.content = ContentRepository(session)
 
     async def build_recap_text_for_couple(self, *, couple: Couple, local_now: datetime, period: str) -> str:
-        members = await self.couples.get_users_for_couple(couple.id)
         return await self.build_recap_text(
-            member_ids=[member.id for member in members],
+            couple_id=couple.id,
             local_now=local_now,
             period=period,
         )
 
-    async def build_recap_text(self, *, member_ids: list[int], local_now: datetime, period: str) -> str:
-        tasks = await self.tasks.list_for_users(member_ids)
-        content_items = await self.content.list_for_users(member_ids)
+    async def build_recap_text(self, *, couple_id: int, local_now: datetime, period: str) -> str:
+        tasks = await self.tasks.list_for_couple(couple_id)
+        content_items = await self.content.list_for_couple(couple_id)
         stats = collect_recap_stats(tasks, content_items, local_now=local_now, period=period)
         if period == "month":
             return build_monthly_recap_text(stats)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, JSON, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -14,9 +14,11 @@ class Notification(CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("status in ('PENDING', 'SENT', 'FAILED', 'CANCELLED')", name="notification_status"),
         UniqueConstraint("dedupe_key", name="uq_notifications_dedupe_key"),
+        Index("ix_notifications_couple_status_scheduled", "couple_id", "status", "scheduled_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    couple_id: Mapped[int] = mapped_column(ForeignKey("couples.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict | None] = mapped_column(JSON)

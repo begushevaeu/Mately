@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, time, timezone
 
-from app.models import Couple, Task, User
+from app.models import Couple, CoupleReminderSettings, Task, User
 from app.schedulers.system import (
     EVENING_REMINDER_TIME,
     MORNING_REMINDER_TIME,
     build_dedupe_key,
+    due_reminder_types,
     is_same_local_minute,
     local_schedule_datetime,
     overdue_tasks,
@@ -46,6 +47,38 @@ def test_scheduler_records_local_scheduled_time_in_utc() -> None:
         tzinfo=timezone.utc,
     )
     assert schedule_time_for_type("evening_reminder") is EVENING_REMINDER_TIME
+
+
+def test_scheduler_uses_custom_reminder_times() -> None:
+    settings = CoupleReminderSettings(
+        couple_id=1,
+        morning_enabled=True,
+        morning_time=time(hour=8, minute=30),
+        evening_enabled=True,
+        evening_time=time(hour=22, minute=15),
+        reminders_paused=False,
+    )
+
+    assert due_reminder_types(settings, datetime(2026, 5, 20, 8, 30, tzinfo=timezone.utc)) == ["morning_reminder"]
+    assert due_reminder_types(settings, datetime(2026, 5, 20, 22, 15, tzinfo=timezone.utc)) == ["evening_reminder"]
+    assert schedule_time_for_type("morning_reminder", settings) == time(hour=8, minute=30)
+
+
+def test_scheduler_skips_disabled_and_paused_reminders() -> None:
+    settings = CoupleReminderSettings(
+        couple_id=1,
+        morning_enabled=False,
+        morning_time=time(hour=9),
+        evening_enabled=True,
+        evening_time=time(hour=21),
+        reminders_paused=False,
+    )
+
+    assert due_reminder_types(settings, datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)) == []
+
+    settings.reminders_paused = True
+
+    assert due_reminder_types(settings, datetime(2026, 5, 20, 21, 0, tzinfo=timezone.utc)) == []
 
 
 def test_scheduler_task_filters_use_deadlines() -> None:

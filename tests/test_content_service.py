@@ -11,6 +11,7 @@ from app.services.content import (
     ContentCategory,
     ContentListFilter,
     ContentService,
+    ContentServiceError,
     apply_content_filter,
     average_rating,
     completed_since_for_period,
@@ -46,21 +47,30 @@ class FakeContentRepository:
     next_rating_id: int = 1
     next_comment_id: int = 1
 
-    async def create(self, *, title: str, category: str, added_by: int) -> ContentItem:
-        item = ContentItem(id=self.next_id, title=title, category=category, added_by=added_by, status="NOT_COMPLETED")
+    async def create(self, *, couple_id: int, title: str, category: str, added_by: int) -> ContentItem:
+        item = ContentItem(
+            id=self.next_id,
+            couple_id=couple_id,
+            title=title,
+            category=category,
+            added_by=added_by,
+            status="NOT_COMPLETED",
+        )
         self.next_id += 1
         self.items[item.id] = item
         return item
 
-    async def get_by_id(self, content_id: int) -> ContentItem | None:
+    async def get_by_id(self, content_id: int, couple_id: int) -> ContentItem | None:
         item = self.items.get(content_id)
+        if item is not None and item.couple_id != couple_id:
+            return None
         if item is not None:
             item.ratings = [rating for rating in self.ratings if rating.content_id == item.id]
             item.comments = [comment for comment in self.comments if comment.content_id == item.id]
         return item
 
-    async def list_for_users(self, user_ids: list[int]) -> list[ContentItem]:
-        items = [item for item in self.items.values() if item.added_by in user_ids]
+    async def list_for_couple(self, couple_id: int) -> list[ContentItem]:
+        items = [item for item in self.items.values() if item.couple_id == couple_id]
         for item in items:
             item.ratings = [rating for rating in self.ratings if rating.content_id == item.id]
             item.comments = [comment for comment in self.comments if comment.content_id == item.id]
@@ -182,6 +192,25 @@ async def test_content_filters_by_status_category_and_rating() -> None:
     assert movie_items == [movie]
     assert high_rated_items == [movie]
     assert content_summary_counts([movie, book, game]) == (1, 2)
+
+
+@pytest.mark.asyncio
+async def test_content_item_from_another_couple_is_hidden() -> None:
+    service, creator, _, content_repository = build_service()
+    content_repository.items[99] = ContentItem(
+        id=99,
+        couple_id=2,
+        title="Foreign content",
+        category=ContentCategory.MOVIE,
+        added_by=999,
+        status="NOT_COMPLETED",
+    )
+
+    _, items = await service.list_items(creator)
+
+    assert items == []
+    with pytest.raises(ContentServiceError):
+        await service.complete_item(creator, 99)
 
 
 def test_content_date_filter_uses_couple_timezone() -> None:

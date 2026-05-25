@@ -103,7 +103,7 @@ class PlaceService:
         place_filter: PlaceListFilter | None = None,
     ) -> tuple[PlaceContext, list[PlaceItem]]:
         context = await self.get_context(current_user)
-        items = await self.places.list_for_users(context.member_ids)
+        items = await self.places.list_for_couple(context.couple.id)
         return context, apply_place_filter(items, place_filter)
 
     async def add_item(self, current_user: User, *, category: PlaceCategory, title: str) -> PlaceItem:
@@ -113,7 +113,13 @@ class PlaceService:
         if len(title) > 255:
             raise PlaceServiceError("Название получилось слишком длинным")
 
-        return await self.places.create(title=title, category=category.value, added_by=current_user.id)
+        context = await self.get_context(current_user)
+        return await self.places.create(
+            couple_id=context.couple.id,
+            title=title,
+            category=category.value,
+            added_by=current_user.id,
+        )
 
     async def visit_item(self, current_user: User, place_id: int) -> PlaceItem:
         context = await self.get_context(current_user)
@@ -168,8 +174,8 @@ class PlaceService:
         return "\n".join(lines)
 
     async def _get_scoped_item(self, context: PlaceContext, place_id: int) -> PlaceItem:
-        item = await self.places.get_by_id(place_id)
-        if item is None or item.added_by not in context.member_ids:
+        item = await self.places.get_by_id(place_id, context.couple.id)
+        if item is None:
             raise PlaceServiceError("Место не найдено")
         return item
 

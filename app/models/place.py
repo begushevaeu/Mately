@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -17,9 +17,11 @@ class PlaceItem(CreatedAtMixin, Base):
             name="place_item_category",
         ),
         CheckConstraint("status in ('NOT_VISITED', 'VISITED')", name="place_item_status"),
+        Index("ix_place_items_couple_status_category", "couple_id", "status", "category"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    couple_id: Mapped[int] = mapped_column(ForeignKey("couples.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="NOT_VISITED", index=True)

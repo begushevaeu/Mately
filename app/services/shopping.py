@@ -54,7 +54,7 @@ class ShoppingService:
     async def list_items(self, current_user: User) -> tuple[ShoppingContext, list[ShoppingItem]]:
         context = await self.get_context(current_user)
         await self.archive_expired_bought_items_for_context(context)
-        return context, await self.shopping.list_visible_for_users(context.member_ids)
+        return context, await self.shopping.list_visible_for_couple(context.couple.id)
 
     async def add_item(self, current_user: User, title: str) -> ShoppingItem:
         title = title.strip()
@@ -63,7 +63,8 @@ class ShoppingService:
         if len(title) > 255:
             raise ShoppingServiceError("Название покупки получилось слишком длинным")
 
-        return await self.shopping.create(title=title, added_by=current_user.id)
+        context = await self.get_context(current_user)
+        return await self.shopping.create(couple_id=context.couple.id, title=title, added_by=current_user.id)
 
     async def mark_bought(self, current_user: User, item_id: int) -> ShoppingItem:
         context = await self.get_context(current_user)
@@ -89,17 +90,17 @@ class ShoppingService:
         now = now or datetime.now(timezone.utc)
         cutoff = start_of_today_utc(context.couple.timezone, now)
         return await self.shopping.archive_bought_before(
-            user_ids=context.member_ids,
+            couple_id=context.couple.id,
             cutoff=cutoff,
             archived_at=now,
         )
 
     async def _get_scoped_item(self, context: ShoppingContext, item_id: int) -> ShoppingItem:
-        item = await self.shopping.get_by_id(item_id)
+        item = await self.shopping.get_by_id(item_id, context.couple.id)
         if item is None:
             raise ShoppingServiceError("Покупка не найдена")
 
-        belongs_to_couple = item.added_by in context.member_ids or item.completed_by in context.member_ids
+        belongs_to_couple = True
         if not belongs_to_couple:
             raise ShoppingServiceError("Покупка не найдена")
 

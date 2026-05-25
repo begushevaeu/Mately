@@ -127,7 +127,7 @@ class ContentService:
         content_filter: ContentListFilter | None = None,
     ) -> tuple[ContentContext, list[ContentItem]]:
         context = await self.get_context(current_user)
-        items = await self.content.list_for_users(context.member_ids)
+        items = await self.content.list_for_couple(context.couple.id)
         return context, apply_content_filter(items, content_filter)
 
     async def add_item(self, current_user: User, *, category: ContentCategory, title: str) -> ContentItem:
@@ -137,7 +137,13 @@ class ContentService:
         if len(title) > 255:
             raise ContentServiceError("Название получилось слишком длинным")
 
-        return await self.content.create(title=title, category=category.value, added_by=current_user.id)
+        context = await self.get_context(current_user)
+        return await self.content.create(
+            couple_id=context.couple.id,
+            title=title,
+            category=category.value,
+            added_by=current_user.id,
+        )
 
     async def complete_item(self, current_user: User, content_id: int) -> ContentMutationResult:
         context = await self.get_context(current_user)
@@ -212,8 +218,8 @@ class ContentService:
         return "\n".join(lines)
 
     async def _get_scoped_item(self, context: ContentContext, content_id: int) -> ContentItem:
-        item = await self.content.get_by_id(content_id)
-        if item is None or item.added_by not in context.member_ids:
+        item = await self.content.get_by_id(content_id, context.couple.id)
+        if item is None:
             raise ContentServiceError("Контент не найден")
         return item
 

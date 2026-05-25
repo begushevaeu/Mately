@@ -8,6 +8,7 @@ EXPECTED_TABLES = {
     "users",
     "couples",
     "couple_members",
+    "couple_reminder_settings",
     "partner_aliases",
     "tasks",
     "task_history",
@@ -39,17 +40,32 @@ def test_core_tables_are_registered() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
 
 
-def test_mvp_shared_tables_do_not_have_direct_couple_id_yet() -> None:
-    deferred_tables = {"tasks", "shopping_items", "content_items", "place_items", "notifications"}
+def test_shared_tables_are_explicitly_scoped_to_couples() -> None:
+    scoped_tables = {
+        "tasks": "ix_tasks_couple_status_deadline",
+        "shopping_items": "ix_shopping_items_couple_status_created",
+        "content_items": "ix_content_items_couple_status_category",
+        "place_items": "ix_place_items_couple_status_category",
+        "notifications": "ix_notifications_couple_status_scheduled",
+    }
 
-    for table_name in deferred_tables:
-        assert "couple_id" not in Base.metadata.tables[table_name].columns
+    for table_name, index_name in scoped_tables.items():
+        table = Base.metadata.tables[table_name]
+        assert "couple_id" in table.columns
+        assert table.columns["couple_id"].nullable is False
+        assert index_name in index_names(table_name)
+        assert any(
+            isinstance(constraint, ForeignKeyConstraint)
+            and any(element.column.table.name == "couples" for element in constraint.elements)
+            for constraint in table.constraints
+        )
 
 
 def test_core_uniqueness_constraints_are_declared() -> None:
     assert "uq_users_telegram_id" in constraint_names("users", UniqueConstraint)
     assert "uq_couples_invite_code" in constraint_names("couples", UniqueConstraint)
     assert "uq_couple_members_user_id" in constraint_names("couple_members", UniqueConstraint)
+    assert "uq_couple_reminder_settings_couple_id" in constraint_names("couple_reminder_settings", UniqueConstraint)
     assert "uq_partner_aliases_owner_partner" in constraint_names("partner_aliases", UniqueConstraint)
     assert "uq_chat_blocks_user_chat_block" in constraint_names("chat_blocks", UniqueConstraint)
     assert "uq_ratings_content_user" in constraint_names("ratings", UniqueConstraint)
@@ -86,3 +102,18 @@ def test_shopping_and_notification_fields_support_required_flows() -> None:
     assert {"status", "scheduled_at", "delivered_at", "dedupe_key"}.issubset(notification_columns.keys())
     assert "ix_shopping_items_archived_at" in index_names("shopping_items")
     assert "ix_notifications_scheduled_at" in index_names("notifications")
+
+
+def test_couple_reminder_settings_support_scheduler_controls() -> None:
+    columns = Base.metadata.tables["couple_reminder_settings"].columns
+
+    assert {
+        "couple_id",
+        "morning_enabled",
+        "morning_time",
+        "evening_enabled",
+        "evening_time",
+        "reminders_paused",
+    }.issubset(columns.keys())
+    assert columns["couple_id"].nullable is False
+    assert "ix_couple_reminder_settings_couple_id" in index_names("couple_reminder_settings")

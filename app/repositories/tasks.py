@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Task, TaskHistory
@@ -17,6 +17,7 @@ class TaskRepository:
     async def create(
         self,
         *,
+        couple_id: int,
         title: str,
         created_by: int,
         assigned_to: int | None,
@@ -28,6 +29,7 @@ class TaskRepository:
         assigned_at: datetime | None,
     ) -> Task:
         task = Task(
+            couple_id=couple_id,
             title=title,
             created_by=created_by,
             assigned_to=assigned_to,
@@ -42,44 +44,44 @@ class TaskRepository:
         await self.session.flush()
         return task
 
-    async def get_by_id(self, task_id: int) -> Task | None:
-        result = await self.session.execute(select(Task).where(Task.id == task_id))
+    async def get_by_id(self, task_id: int, couple_id: int) -> Task | None:
+        result = await self.session.execute(select(Task).where(Task.id == task_id, Task.couple_id == couple_id))
         return result.scalar_one_or_none()
 
-    async def list_active_for_users(self, user_ids: list[int]) -> list[Task]:
+    async def list_active_for_couple(self, couple_id: int) -> list[Task]:
         result = await self.session.execute(
             select(Task)
             .where(
+                Task.couple_id == couple_id,
                 Task.status.in_(ACTIVE_TASK_STATUSES),
-                or_(Task.created_by.in_(user_ids), Task.assigned_to.in_(user_ids)),
             )
             .order_by(Task.deadline.is_(None), Task.deadline, Task.id)
         )
         return list(result.scalars().all())
 
-    async def list_for_users(self, user_ids: list[int]) -> list[Task]:
+    async def list_for_couple(self, couple_id: int) -> list[Task]:
         result = await self.session.execute(
             select(Task)
-            .where(or_(Task.created_by.in_(user_ids), Task.assigned_to.in_(user_ids)))
+            .where(Task.couple_id == couple_id)
             .order_by(Task.deadline.is_(None), Task.deadline, Task.id)
         )
         return list(result.scalars().all())
 
-    async def list_assigned_to_user(self, user_id: int) -> list[Task]:
+    async def list_assigned_to_user(self, couple_id: int, user_id: int) -> list[Task]:
         result = await self.session.execute(
             select(Task)
-            .where(Task.status.in_(ACTIVE_TASK_STATUSES), Task.assigned_to == user_id)
+            .where(Task.couple_id == couple_id, Task.status.in_(ACTIVE_TASK_STATUSES), Task.assigned_to == user_id)
             .order_by(Task.deadline.is_(None), Task.deadline, Task.id)
         )
         return list(result.scalars().all())
 
-    async def list_pool_for_users(self, user_ids: list[int]) -> list[Task]:
+    async def list_pool_for_couple(self, couple_id: int) -> list[Task]:
         result = await self.session.execute(
             select(Task)
             .where(
+                Task.couple_id == couple_id,
                 Task.status == "OPEN",
                 Task.assigned_to.is_(None),
-                Task.created_by.in_(user_ids),
             )
             .order_by(Task.deadline.is_(None), Task.deadline, Task.id)
         )

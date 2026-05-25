@@ -13,8 +13,9 @@ class ContentRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create(self, *, title: str, category: str, added_by: int) -> ContentItem:
+    async def create(self, *, couple_id: int, title: str, category: str, added_by: int) -> ContentItem:
         item = ContentItem(
+            couple_id=couple_id,
             title=title,
             category=category,
             added_by=added_by,
@@ -24,18 +25,18 @@ class ContentRepository:
         await self.session.flush()
         return item
 
-    async def get_by_id(self, content_id: int) -> ContentItem | None:
+    async def get_by_id(self, content_id: int, couple_id: int) -> ContentItem | None:
         result = await self.session.execute(
             select(ContentItem)
-            .where(ContentItem.id == content_id)
+            .where(ContentItem.id == content_id, ContentItem.couple_id == couple_id)
             .options(selectinload(ContentItem.ratings), selectinload(ContentItem.comments))
         )
         return result.scalar_one_or_none()
 
-    async def list_for_users(self, user_ids: list[int]) -> list[ContentItem]:
+    async def list_for_couple(self, couple_id: int) -> list[ContentItem]:
         result = await self.session.execute(
             select(ContentItem)
-            .where(ContentItem.added_by.in_(user_ids))
+            .where(ContentItem.couple_id == couple_id)
             .options(selectinload(ContentItem.ratings), selectinload(ContentItem.comments))
             .order_by(ContentItem.status, ContentItem.category, ContentItem.title, ContentItem.id)
         )

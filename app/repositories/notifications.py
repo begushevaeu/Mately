@@ -12,13 +12,16 @@ class NotificationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_dedupe_key(self, dedupe_key: str) -> Notification | None:
-        result = await self.session.execute(select(Notification).where(Notification.dedupe_key == dedupe_key))
+    async def get_by_dedupe_key(self, dedupe_key: str, couple_id: int) -> Notification | None:
+        result = await self.session.execute(
+            select(Notification).where(Notification.dedupe_key == dedupe_key, Notification.couple_id == couple_id)
+        )
         return result.scalar_one_or_none()
 
     async def create_pending(
         self,
         *,
+        couple_id: int,
         user_id: int,
         notification_type: str,
         scheduled_at: datetime,
@@ -26,6 +29,7 @@ class NotificationRepository:
         payload: dict | None = None,
     ) -> Notification:
         notification = Notification(
+            couple_id=couple_id,
             user_id=user_id,
             type=notification_type,
             payload=payload,

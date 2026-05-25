@@ -5,6 +5,7 @@ from app.models.couple import Couple, CoupleMember
 from app.models.notification import Notification
 from app.models.partner_alias import PartnerAlias
 from app.models.place import PlaceComment, PlaceItem, PlaceRating
+from app.models.reminder_settings import CoupleReminderSettings
 from app.models.shopping import ShoppingItem
 from app.models.task import Task, TaskHistory
 from app.models.user import User
@@ -16,6 +17,7 @@ __all__ = [
     "ContentItem",
     "Couple",
     "CoupleMember",
+    "CoupleReminderSettings",
     "Notification",
     "PartnerAlias",
     "PlaceComment",

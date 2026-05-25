@@ -45,21 +45,30 @@ class FakePlaceRepository:
     next_rating_id: int = 1
     next_comment_id: int = 1
 
-    async def create(self, *, title: str, category: str, added_by: int) -> PlaceItem:
-        item = PlaceItem(id=self.next_id, title=title, category=category, added_by=added_by, status="NOT_VISITED")
+    async def create(self, *, couple_id: int, title: str, category: str, added_by: int) -> PlaceItem:
+        item = PlaceItem(
+            id=self.next_id,
+            couple_id=couple_id,
+            title=title,
+            category=category,
+            added_by=added_by,
+            status="NOT_VISITED",
+        )
         self.next_id += 1
         self.items[item.id] = item
         return item
 
-    async def get_by_id(self, place_id: int) -> PlaceItem | None:
+    async def get_by_id(self, place_id: int, couple_id: int) -> PlaceItem | None:
         item = self.items.get(place_id)
+        if item is not None and item.couple_id != couple_id:
+            return None
         if item is not None:
             item.ratings = [rating for rating in self.ratings if rating.place_id == item.id]
             item.comments = [comment for comment in self.comments if comment.place_id == item.id]
         return item
 
-    async def list_for_users(self, user_ids: list[int]) -> list[PlaceItem]:
-        items = [item for item in self.items.values() if item.added_by in user_ids]
+    async def list_for_couple(self, couple_id: int) -> list[PlaceItem]:
+        items = [item for item in self.items.values() if item.couple_id == couple_id]
         for item in items:
             item.ratings = [rating for rating in self.ratings if rating.place_id == item.id]
             item.comments = [comment for comment in self.comments if comment.place_id == item.id]
@@ -165,3 +174,22 @@ async def test_place_filters_by_visit_status() -> None:
     assert visited_items == [park]
     assert place_summary_counts([restaurant, park]) == (1, 1)
     assert apply_place_filter([park, restaurant], PlaceListFilter(status="VISITED")) == [park]
+
+
+@pytest.mark.asyncio
+async def test_place_from_another_couple_is_hidden() -> None:
+    service, creator, _, place_repository = build_service()
+    place_repository.items[99] = PlaceItem(
+        id=99,
+        couple_id=2,
+        title="Foreign place",
+        category=PlaceCategory.CAFE,
+        added_by=999,
+        status="NOT_VISITED",
+    )
+
+    _, items = await service.list_items(creator)
+
+    assert items == []
+    with pytest.raises(PlaceServiceError):
+        await service.visit_item(creator, 99)

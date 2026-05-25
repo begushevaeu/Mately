@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 
 class Settings(BaseModel):
@@ -18,6 +18,13 @@ class Settings(BaseModel):
     invite_code_ttl_hours: int = Field(default=168, alias="INVITE_CODE_TTL_HOURS")
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
 
 
 @lru_cache

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from app.core.config import Settings
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -33,3 +35,20 @@ def test_compose_waits_for_database_health() -> None:
 
     assert "condition: service_healthy" in compose
     assert "pg_isready -U mately -d mately" in compose
+
+
+def test_production_compose_keeps_database_private() -> None:
+    compose = (PROJECT_ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
+
+    assert "docker/Dockerfile" in compose
+    assert "POSTGRES_PASSWORD is required" in compose
+    assert "postgres_data:/var/lib/postgresql/data" in compose
+    assert "5432:5432" not in compose
+
+
+def test_managed_postgres_url_is_normalized_for_async_sqlalchemy() -> None:
+    settings = Settings.model_validate(
+        {"DATABASE_URL": "postgresql://user:password@example.internal:5432/mately"}
+    )
+
+    assert settings.database_url == "postgresql+asyncpg://user:password@example.internal:5432/mately"

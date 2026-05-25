@@ -51,36 +51,34 @@ class FakeTaskRepository:
         self.tasks[task.id] = task
         return task
 
-    async def get_by_id(self, task_id: int) -> Task | None:
-        return self.tasks.get(task_id)
+    async def get_by_id(self, task_id: int, couple_id: int) -> Task | None:
+        task = self.tasks.get(task_id)
+        if task is None or task.couple_id != couple_id:
+            return None
+        return task
 
-    async def list_active_for_users(self, user_ids: list[int]) -> list[Task]:
+    async def list_active_for_couple(self, couple_id: int) -> list[Task]:
         return [
             task
             for task in self.tasks.values()
-            if task.status in {"OPEN", "ASSIGNED", "OVERDUE"}
-            and (task.created_by in user_ids or task.assigned_to in user_ids)
+            if task.couple_id == couple_id and task.status in {"OPEN", "ASSIGNED", "OVERDUE"}
         ]
 
-    async def list_for_users(self, user_ids: list[int]) -> list[Task]:
+    async def list_for_couple(self, couple_id: int) -> list[Task]:
+        return [task for task in self.tasks.values() if task.couple_id == couple_id]
+
+    async def list_assigned_to_user(self, couple_id: int, user_id: int) -> list[Task]:
         return [
             task
             for task in self.tasks.values()
-            if task.created_by in user_ids or task.assigned_to in user_ids
+            if task.couple_id == couple_id and task.status in {"OPEN", "ASSIGNED", "OVERDUE"} and task.assigned_to == user_id
         ]
 
-    async def list_assigned_to_user(self, user_id: int) -> list[Task]:
+    async def list_pool_for_couple(self, couple_id: int) -> list[Task]:
         return [
             task
             for task in self.tasks.values()
-            if task.status in {"OPEN", "ASSIGNED", "OVERDUE"} and task.assigned_to == user_id
-        ]
-
-    async def list_pool_for_users(self, user_ids: list[int]) -> list[Task]:
-        return [
-            task
-            for task in self.tasks.values()
-            if task.status == "OPEN" and task.assigned_to is None and task.created_by in user_ids
+            if task.couple_id == couple_id and task.status == "OPEN" and task.assigned_to is None
         ]
 
     async def add_history(self, *, task_id: int, event_type: str, actor_id: int, details: str | None = None) -> None:
