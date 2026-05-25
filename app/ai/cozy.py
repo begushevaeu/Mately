@@ -20,6 +20,7 @@ class CozyMessageTheme(StrEnum):
     TASK_CLAIMED = "task_claimed"
     TASK_ARCHIVED = "task_archived"
     CONTENT_COMPLETED = "content_completed"
+    PLACE_VISITED = "place_visited"
     RECAP = "recap"
     CAT_CAPTION = "cat_caption"
 
@@ -30,6 +31,7 @@ THEME_LABELS = {
     CozyMessageTheme.TASK_CLAIMED: "claimed household task",
     CozyMessageTheme.TASK_ARCHIVED: "stopped or removed household task",
     CozyMessageTheme.CONTENT_COMPLETED: "completed shared content",
+    CozyMessageTheme.PLACE_VISITED: "visited shared place",
     CozyMessageTheme.RECAP: "short couple recap",
     CozyMessageTheme.CAT_CAPTION: "cat caption",
 }
@@ -40,6 +42,7 @@ FALLBACK_MESSAGES = {
     CozyMessageTheme.TASK_CLAIMED: "Задача нашла своего героя. Где-то рядом довольно мурчит невидимый кот.",
     CozyMessageTheme.TASK_ARCHIVED: "Домашний список стал чуточку легче. Котики спокойно кивают.",
     CozyMessageTheme.CONTENT_COMPLETED: "Общее культурное досье пополнилось. Плед и котик мысленно уже рядом.",
+    CozyMessageTheme.PLACE_VISITED: "Общая карта воспоминаний получила новую отметку. Котики одобрительно сверились с маршрутом.",
     CozyMessageTheme.RECAP: "День стал немного собраннее и теплее. Котики записали это в хорошие новости.",
     CozyMessageTheme.CAT_CAPTION: "Котик смотрит так, будто все понял и никому не расскажет.",
 }

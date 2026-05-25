@@ -41,15 +41,21 @@ class ContentItem(CreatedAtMixin, Base):
 class Rating(CreatedAtMixin, Base):
     __tablename__ = "ratings"
     __table_args__ = (
-        CheckConstraint("score between 1 and 10", name="rating_score_range"),
+        CheckConstraint("response in ('RATED', 'NOT_ACQUAINTED')", name="rating_response"),
+        CheckConstraint(
+            "(response = 'RATED' and score between 1 and 10) "
+            "or (response = 'NOT_ACQUAINTED' and score is null and emoji is null)",
+            name="rating_response_score",
+        ),
         UniqueConstraint("content_id", "user_id", name="uq_ratings_content_user"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     content_id: Mapped[int] = mapped_column(ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
-    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer)
     emoji: Mapped[str | None] = mapped_column(String(32))
+    response: Mapped[str] = mapped_column(String(32), nullable=False, default="RATED", server_default="RATED")
 
     content_item: Mapped["ContentItem"] = relationship(back_populates="ratings")
 

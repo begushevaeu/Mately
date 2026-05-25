@@ -7,11 +7,13 @@ from html import escape
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import CozyMessageTheme
 from app.models import Couple, PlaceComment, PlaceItem, PlaceRating, User
+from app.notifications.cats import CatNotificationType
 from app.repositories.couples import CoupleRepository
 from app.repositories.partner_aliases import PartnerAliasRepository
 from app.repositories.places import PlaceRepository
-from app.services.partner_aliases import PartnerAliasService
+from app.services.partner_aliases import DisplayName, PartnerAliasService
 from app.utils.dates import get_timezone
 
 
@@ -60,6 +62,10 @@ class PlaceContext:
     def member_ids(self) -> list[int]:
         return [member.id for member in self.members]
 
+    @property
+    def partner(self) -> User | None:
+        return next((member for member in self.members if member.id != self.current_user.id), None)
+
     def user_by_id(self, user_id: int | None) -> User | None:
         if user_id is None:
             return None
@@ -69,6 +75,20 @@ class PlaceContext:
 @dataclass(slots=True)
 class PlaceListFilter:
     status: str | None = None
+
+
+@dataclass(slots=True)
+class PlaceMutationResult:
+    item: PlaceItem
+    notification_user: User | None = None
+    notification_text: str | None = None
+    cozy_theme: CozyMessageTheme | None = None
+    cozy_subject: str | None = None
+    cat_notification_type: CatNotificationType | None = None
+
+
+NOT_ACQUAINTED_RESPONSE = "NOT_ACQUAINTED"
+RATED_RESPONSE = "RATED"
 
 
 class PlaceService:
@@ -121,16 +141,29 @@ class PlaceService:
             added_by=current_user.id,
         )
 
-    async def visit_item(self, current_user: User, place_id: int) -> PlaceItem:
+    async def visit_item(self, current_user: User, place_id: int) -> PlaceMutationResult:
         context = await self.get_context(current_user)
         item = await self._get_scoped_item(context, place_id)
         if item.status == "VISITED":
             raise PlaceServiceError("Место уже отмечено посещенным")
 
-        return await self.places.mark_visited(
+        item = await self.places.mark_visited(
             item,
             visited_by=current_user.id,
             visited_at=datetime.now(timezone.utc),
+        )
+        partner = context.partner
+        actor_label = await self._display_for_partner_or_fallback(owner=partner, partner=current_user)
+        return PlaceMutationResult(
+            item=item,
+            notification_user=partner,
+            notification_text=(
+                f"{actor_label.nominative_with_emoji} отметил(а) «{item.title}» как посещённое. "
+                "Поставь оценку или нажми «Не был(а)»."
+            ),
+            cozy_theme=CozyMessageTheme.PLACE_VISITED,
+            cozy_subject=item.title,
+            cat_notification_type=CatNotificationType.COMPLETED,
         )
 
     async def save_rating(self, current_user: User, *, place_id: int, score: int) -> PlaceRating:
@@ -143,6 +176,14 @@ class PlaceService:
             raise PlaceServiceError("Оценка доступна только после посещения")
 
         return await self.places.upsert_rating(place_id=item.id, user_id=current_user.id, score=score)
+
+    async def save_not_acquainted(self, current_user: User, *, place_id: int) -> PlaceRating:
+        context = await self.get_context(current_user)
+        item = await self._get_scoped_item(context, place_id)
+        if item.status != "VISITED":
+            raise PlaceServiceError("Ответ доступен только после посещения")
+
+        return await self.places.upsert_not_acquainted(place_id=item.id, user_id=current_user.id)
 
     async def add_comment(self, current_user: User, *, place_id: int, text: str) -> PlaceComment:
         text = normalize_comment_text(text)
@@ -165,6 +206,10 @@ class PlaceService:
             visited_by = await self._actor_line(context, item.visited_by)
             lines.append(f"Посетили: {format_visited_at(item.visited_at, context.couple.timezone)}")
             lines.append(f"Отметил(а): {visited_by}")
+
+        not_acquainted_line = await self._not_acquainted_line(context, item)
+        if not_acquainted_line:
+            lines.append(not_acquainted_line)
 
         comment_lines = await self._comment_lines(context, item)
         if comment_lines:
@@ -196,6 +241,20 @@ class PlaceService:
             author = await self._actor_line(context, comment.user_id)
             lines.append(f"• {author}: {escape(comment.text)}")
         return lines
+
+    async def _not_acquainted_line(self, context: PlaceContext, item: PlaceItem) -> str | None:
+        ratings = [rating for rating in item.ratings if rating.response == NOT_ACQUAINTED_RESPONSE]
+        if not ratings:
+            return None
+
+        names = [await self._actor_line(context, rating.user_id) for rating in ratings]
+        return f"Не был(а): {', '.join(names)}"
+
+    async def _display_for_partner_or_fallback(self, *, owner: User | None, partner: User) -> DisplayName:
+        if owner is None:
+            return DisplayName(emoji="", nominative="Партнёр", genitive="партнёра", dative="партнёру")
+
+        return await self.aliases.get_display_for(owner=owner, partner=partner)
 
 
 def apply_place_filter(items: list[PlaceItem], place_filter: PlaceListFilter | None) -> list[PlaceItem]:
@@ -247,9 +306,10 @@ def status_label(item: PlaceItem) -> str:
 
 
 def average_rating(item: PlaceItem) -> float | None:
-    if not item.ratings:
+    scores = [rating.score for rating in item.ratings if rating.score is not None]
+    if not scores:
         return None
-    return sum(rating.score for rating in item.ratings) / len(item.ratings)
+    return sum(scores) / len(scores)
 
 
 def format_average_rating(item: PlaceItem) -> str:

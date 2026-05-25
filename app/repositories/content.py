@@ -61,11 +61,34 @@ class ContentRepository:
         )
         rating = result.scalar_one_or_none()
         if rating is None:
-            rating = Rating(content_id=content_id, user_id=user_id, score=score, emoji=emoji)
+            rating = Rating(content_id=content_id, user_id=user_id, score=score, emoji=emoji, response="RATED")
             self.session.add(rating)
         else:
             rating.score = score
             rating.emoji = emoji
+            rating.response = "RATED"
+
+        await self.session.flush()
+        return rating
+
+    async def upsert_not_acquainted(self, *, content_id: int, user_id: int) -> Rating:
+        result = await self.session.execute(
+            select(Rating).where(Rating.content_id == content_id, Rating.user_id == user_id)
+        )
+        rating = result.scalar_one_or_none()
+        if rating is None:
+            rating = Rating(
+                content_id=content_id,
+                user_id=user_id,
+                score=None,
+                emoji=None,
+                response="NOT_ACQUAINTED",
+            )
+            self.session.add(rating)
+        else:
+            rating.score = None
+            rating.emoji = None
+            rating.response = "NOT_ACQUAINTED"
 
         await self.session.flush()
         return rating

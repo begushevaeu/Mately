@@ -23,6 +23,7 @@ from app.bot.keyboards.content import (
     CONTENT_FILTER_WEEK_CALLBACK,
     CONTENT_FILTERS_CALLBACK,
     CONTENT_MENU_CALLBACK,
+    CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX,
     CONTENT_PLANNED_CALLBACK,
     build_content_category_keyboard,
     build_content_cancel_keyboard,
@@ -616,6 +617,37 @@ async def handle_content_score(callback: CallbackQuery, state: FSMContext, sessi
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith(CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX))
+async def handle_content_not_acquainted(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    result = await ensure_content_access_for_callback(callback, session)
+    if result is None or callback.message is None or callback.data is None:
+        return
+
+    data = await state.get_data()
+    content_id = data.get("content_id")
+    try:
+        callback_prefix = f"{CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX}:"
+        if callback.data.startswith(callback_prefix):
+            content_id = int(callback.data.removeprefix(callback_prefix))
+        elif content_id is not None:
+            content_id = int(content_id)
+        else:
+            raise ValueError
+        await ContentService(session).save_not_acquainted(result.user, content_id=content_id)
+    except (TypeError, ValueError, ContentServiceError) as error:
+        await callback.answer(str(error) if str(error) else "Не смогла понять контент.", show_alert=True)
+        return
+
+    text, keyboard = await build_content_root_panel(session, result.user)
+    await edit_content_panel(
+        callback.message,
+        f"✅ <b>Ответ сохранён:</b> не знаком(а)\n\n{text}",
+        keyboard,
+    )
+    await state.clear()
+    await callback.answer("Сохранила")
+
+
 @router.callback_query(F.data.startswith("content:emoji:"))
 async def handle_content_reaction(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     result = await ensure_content_access_for_callback(callback, session)
@@ -659,11 +691,12 @@ async def handle_content_inline_step_text(message: Message, state: FSMContext, s
     await delete_user_message(bot, message)
     current_state = await state.get_state()
     if current_state == ContentStates.choosing_rating.state:
+        data = await state.get_data()
         await edit_content_panel_from_state(
             bot,
             state,
             "🎬 <b>Оценка</b>\n\nВыбери оценку кнопкой в панели.",
-            build_content_rating_keyboard(),
+            build_content_rating_keyboard(data.get("content_id")),
         )
     else:
         await edit_content_panel_from_state(

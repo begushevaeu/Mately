@@ -10,6 +10,7 @@ ADD_PLACE_CALLBACK = "places:add"
 PLACES_PLANNED_CALLBACK = "places:list:planned"
 PLACES_VISITED_CALLBACK = "places:list:visited"
 PLACES_CANCEL_CALLBACK = "places:cancel"
+PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX = "places:not_acquainted"
 
 
 def build_places_keyboard() -> InlineKeyboardMarkup:
@@ -91,5 +92,27 @@ def build_place_rating_keyboard(place_id: int | None = None) -> InlineKeyboardMa
             ]
         )
     if place_id is not None:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Не был(а)",
+                    callback_data=f"{PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX}:{place_id}",
+                )
+            ]
+        )
         rows.append([InlineKeyboardButton(text="Поставить позже", callback_data=PLACES_MENU_CALLBACK)])
     return with_close_button(InlineKeyboardMarkup(inline_keyboard=rows), PLACES_BLOCK_KEY)
+
+
+def build_place_notification_keyboard(place_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Поставить оценку", callback_data=f"places:rate:{place_id}")],
+            [
+                InlineKeyboardButton(
+                    text="Не был(а)",
+                    callback_data=f"{PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX}:{place_id}",
+                )
+            ],
+        ]
+    )

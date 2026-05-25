@@ -42,14 +42,20 @@ class PlaceItem(CreatedAtMixin, Base):
 class PlaceRating(CreatedAtMixin, Base):
     __tablename__ = "place_ratings"
     __table_args__ = (
-        CheckConstraint("score between 1 and 10", name="place_rating_score_range"),
+        CheckConstraint("response in ('RATED', 'NOT_ACQUAINTED')", name="place_rating_response"),
+        CheckConstraint(
+            "(response = 'RATED' and score between 1 and 10) "
+            "or (response = 'NOT_ACQUAINTED' and score is null)",
+            name="place_rating_response_score",
+        ),
         UniqueConstraint("place_id", "user_id", name="uq_place_ratings_place_user"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     place_id: Mapped[int] = mapped_column(ForeignKey("place_items.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
-    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer)
+    response: Mapped[str] = mapped_column(String(32), nullable=False, default="RATED", server_default="RATED")
 
     place_item: Mapped["PlaceItem"] = relationship(back_populates="ratings")
 

@@ -7,27 +7,32 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.cozy import append_cozy_suffix
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.main_menu import PLACES_BUTTON
 from app.bot.keyboards.places import (
     ADD_PLACE_CALLBACK,
     PLACES_CANCEL_CALLBACK,
     PLACES_MENU_CALLBACK,
+    PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX,
     PLACES_PLANNED_CALLBACK,
     PLACES_VISITED_CALLBACK,
     build_place_cancel_keyboard,
     build_place_category_keyboard,
     build_place_list_keyboard,
+    build_place_notification_keyboard,
     build_place_rating_keyboard,
     build_places_menu,
 )
 from app.bot.states.places import PlaceStates
+from app.notifications.delivery import send_user_notification
 from app.services.chat_blocks import PLACES_BLOCK_KEY, ChatBlockService
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
 from app.services.places import (
     CATEGORY_LABELS,
     PlaceCategory,
     PlaceListFilter,
+    PlaceMutationResult,
     PlaceService,
     PlaceServiceError,
     place_summary_counts,
@@ -85,13 +90,42 @@ async def add_places_block_messages(session: AsyncSession, user, chat_id: int, m
     )
 
 
+async def send_place_notification(bot: Bot, result: PlaceMutationResult) -> None:
+    if result.notification_user is None or result.notification_text is None:
+        return
+
+    notification_text = await append_cozy_suffix(
+        result.notification_text,
+        theme=result.cozy_theme,
+        subject=result.cozy_subject,
+    )
+    await send_user_notification(
+        bot,
+        result.notification_user,
+        notification_text,
+        cat_notification_type=result.cat_notification_type,
+        reply_markup=build_place_notification_keyboard(result.item.id),
+    )
+
+
 async def remember_places_panel_in_state(state: FSMContext, message: Message) -> None:
-    await state.update_data(places_panel_chat_id=message.chat.id, places_panel_message_id=message.message_id)
+    await state.update_data(
+        places_panel_chat_id=message.chat.id,
+        places_panel_message_id=message.message_id,
+        places_panel_is_media=is_media_panel_message(message),
+    )
+
+
+def is_media_panel_message(message: Message) -> bool:
+    return bool(getattr(message, "photo", None))
 
 
 async def edit_places_panel(message: Message, text: str, reply_markup=None) -> None:
     try:
-        await message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
+        if is_media_panel_message(message):
+            await message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
     except TelegramAPIError:
         logger.exception("Failed to edit places panel")
 
@@ -100,17 +134,27 @@ async def edit_places_panel_from_state(bot: Bot, state: FSMContext, text: str, r
     data = await state.get_data()
     chat_id = data.get("places_panel_chat_id")
     message_id = data.get("places_panel_message_id")
+    is_media_panel = data.get("places_panel_is_media", False)
     if chat_id is None or message_id is None:
         return
 
     try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode="HTML",
-        )
+        if is_media_panel:
+            await bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=message_id,
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
     except TelegramAPIError:
         logger.exception("Failed to edit places panel from state")
 
@@ -307,18 +351,20 @@ async def handle_places_status_list(callback: CallbackQuery, session: AsyncSessi
 
 
 @router.callback_query(F.data.startswith("places:visit:"))
-async def handle_visit_place(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+async def handle_visit_place(callback: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     result = await ensure_places_access_for_callback(callback, session)
     if result is None or callback.message is None or callback.data is None:
         return
 
     try:
         place_id = int(callback.data.rsplit(":", maxsplit=1)[-1])
-        item = await PlaceService(session).visit_item(result.user, place_id)
+        mutation_result = await PlaceService(session).visit_item(result.user, place_id)
     except (ValueError, PlaceServiceError) as error:
         await callback.answer(str(error), show_alert=True)
         return
 
+    await send_place_notification(bot, mutation_result)
+    item = mutation_result.item
     await remember_places_panel_in_state(state, callback.message)
     await state.update_data(place_id=item.id)
     await state.set_state(PlaceStates.choosing_rating)
@@ -378,6 +424,37 @@ async def handle_place_score(callback: CallbackQuery, state: FSMContext, session
     )
     await state.clear()
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith(PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX))
+async def handle_place_not_acquainted(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    result = await ensure_places_access_for_callback(callback, session)
+    if result is None or callback.message is None or callback.data is None:
+        return
+
+    data = await state.get_data()
+    place_id = data.get("place_id")
+    try:
+        callback_prefix = f"{PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX}:"
+        if callback.data.startswith(callback_prefix):
+            place_id = int(callback.data.removeprefix(callback_prefix))
+        elif place_id is not None:
+            place_id = int(place_id)
+        else:
+            raise ValueError
+        await PlaceService(session).save_not_acquainted(result.user, place_id=place_id)
+    except (TypeError, ValueError, PlaceServiceError) as error:
+        await callback.answer(str(error) if str(error) else "Не смогла понять место.", show_alert=True)
+        return
+
+    text, keyboard = await build_places_root_panel(session, result.user)
+    await edit_places_panel(
+        callback.message,
+        f"✅ <b>Ответ сохранён:</b> не был(а)\n\n{text}",
+        keyboard,
+    )
+    await state.clear()
+    await callback.answer("Сохранила")
 
 
 @router.callback_query(F.data.startswith("places:comment:"))
@@ -447,9 +524,10 @@ async def handle_place_rating_text(message: Message, state: FSMContext, session:
         return
 
     await delete_user_message(bot, message)
+    data = await state.get_data()
     await edit_places_panel_from_state(
         bot,
         state,
         "📍 <b>Оценка</b>\n\nВыбери оценку кнопкой в панели.",
-        build_place_rating_keyboard(),
+        build_place_rating_keyboard(data.get("place_id")),
     )

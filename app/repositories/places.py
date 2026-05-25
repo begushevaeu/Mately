@@ -55,10 +55,26 @@ class PlaceRepository:
         )
         rating = result.scalar_one_or_none()
         if rating is None:
-            rating = PlaceRating(place_id=place_id, user_id=user_id, score=score)
+            rating = PlaceRating(place_id=place_id, user_id=user_id, score=score, response="RATED")
             self.session.add(rating)
         else:
             rating.score = score
+            rating.response = "RATED"
+
+        await self.session.flush()
+        return rating
+
+    async def upsert_not_acquainted(self, *, place_id: int, user_id: int) -> PlaceRating:
+        result = await self.session.execute(
+            select(PlaceRating).where(PlaceRating.place_id == place_id, PlaceRating.user_id == user_id)
+        )
+        rating = result.scalar_one_or_none()
+        if rating is None:
+            rating = PlaceRating(place_id=place_id, user_id=user_id, score=None, response="NOT_ACQUAINTED")
+            self.session.add(rating)
+        else:
+            rating.score = None
+            rating.response = "NOT_ACQUAINTED"
 
         await self.session.flush()
         return rating

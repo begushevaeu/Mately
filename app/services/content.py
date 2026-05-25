@@ -95,6 +95,10 @@ class ContentMutationResult:
     cat_notification_type: CatNotificationType | None = None
 
 
+NOT_ACQUAINTED_RESPONSE = "NOT_ACQUAINTED"
+RATED_RESPONSE = "RATED"
+
+
 class ContentService:
     def __init__(
         self,
@@ -189,6 +193,14 @@ class ContentService:
             emoji=emoji,
         )
 
+    async def save_not_acquainted(self, current_user: User, *, content_id: int) -> Rating:
+        context = await self.get_context(current_user)
+        item = await self._get_scoped_item(context, content_id)
+        if item.status != "COMPLETED":
+            raise ContentServiceError("Ответ доступен только после завершения")
+
+        return await self.content.upsert_not_acquainted(content_id=item.id, user_id=current_user.id)
+
     async def add_comment(self, current_user: User, *, content_id: int, text: str) -> Comment:
         text = normalize_comment_text(text)
         context = await self.get_context(current_user)
@@ -205,6 +217,10 @@ class ContentService:
         ]
         if item.completed_at is not None:
             lines.append(f"Завершено: {format_completed_at(item.completed_at, context.couple.timezone)}")
+
+        not_acquainted_line = await self._not_acquainted_line(context, item)
+        if not_acquainted_line:
+            lines.append(not_acquainted_line)
 
         reaction_line = format_reactions(item)
         if reaction_line:
@@ -241,6 +257,14 @@ class ContentService:
             author = await self._actor_line(context, comment.user_id)
             lines.append(f"• {author}: {escape(comment.text)}")
         return lines
+
+    async def _not_acquainted_line(self, context: ContentContext, item: ContentItem) -> str | None:
+        ratings = [rating for rating in item.ratings if rating.response == NOT_ACQUAINTED_RESPONSE]
+        if not ratings:
+            return None
+
+        names = [await self._actor_line(context, rating.user_id) for rating in ratings]
+        return f"Не знаком(а): {', '.join(names)}"
 
     async def _display_for_partner_or_fallback(self, *, owner: User | None, partner: User) -> DisplayName:
         if owner is None:
@@ -317,9 +341,10 @@ def status_label(item: ContentItem) -> str:
 
 
 def average_rating(item: ContentItem) -> float | None:
-    if not item.ratings:
+    scores = [rating.score for rating in item.ratings if rating.score is not None]
+    if not scores:
         return None
-    return sum(rating.score for rating in item.ratings) / len(item.ratings)
+    return sum(scores) / len(scores)
 
 
 def format_average_rating(item: ContentItem) -> str:
@@ -330,7 +355,7 @@ def format_average_rating(item: ContentItem) -> str:
 
 
 def format_reactions(item: ContentItem) -> str:
-    reactions = [rating.emoji for rating in item.ratings if rating.emoji]
+    reactions = [rating.emoji for rating in item.ratings if rating.score is not None and rating.emoji]
     return " ".join(reactions)
 
 

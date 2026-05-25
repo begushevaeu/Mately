@@ -80,7 +80,7 @@ def collect_recap_stats(
     recap_period = build_recap_period(local_now, period)
     completed_tasks = [task for task in tasks if is_in_period(task.completed_at, recap_period)]
     completed_content = [item for item in content_items if is_in_period(item.completed_at, recap_period)]
-    ratings = [rating.score for item in completed_content for rating in item.ratings]
+    ratings = [rating.score for item in completed_content for rating in item.ratings if rating.score is not None]
     now_utc = local_now.astimezone(timezone.utc)
     overdue_count = len(
         [

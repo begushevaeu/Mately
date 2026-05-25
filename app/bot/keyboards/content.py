@@ -19,6 +19,7 @@ CONTENT_FILTER_WEEK_CALLBACK = "content:filters:completed:week"
 CONTENT_FILTER_MONTH_CALLBACK = "content:filters:completed:month"
 CONTENT_CANCEL_CALLBACK = "content:cancel"
 CONTENT_EMOJI_SKIP_CALLBACK = "content:emoji:skip"
+CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX = "content:not_acquainted"
 
 
 def build_content_menu() -> InlineKeyboardMarkup:
@@ -128,6 +129,14 @@ def build_content_rating_keyboard(content_id: int | None = None) -> InlineKeyboa
             ]
         )
     if content_id is not None:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Не знаком(а)",
+                    callback_data=f"{CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX}:{content_id}",
+                )
+            ]
+        )
         rows.append([InlineKeyboardButton(text="Поставить позже", callback_data=CONTENT_MENU_CALLBACK)])
     return with_close_button(InlineKeyboardMarkup(inline_keyboard=rows), CONTENT_BLOCK_KEY)
 
@@ -151,5 +160,11 @@ def build_content_notification_keyboard(content_id: int) -> InlineKeyboardMarkup
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Поставить оценку", callback_data=f"content:rate:{content_id}")],
+            [
+                InlineKeyboardButton(
+                    text="Не знаком(а)",
+                    callback_data=f"{CONTENT_NOT_ACQUAINTED_CALLBACK_PREFIX}:{content_id}",
+                )
+            ],
         ]
     )
