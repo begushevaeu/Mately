@@ -22,6 +22,7 @@ TASK_CREATE_ASSIGN_POOL_CALLBACK = "tasks:create:assign:pool"
 TASK_CREATE_DEADLINE_TODAY_CALLBACK = "tasks:create:deadline:today"
 TASK_CREATE_DEADLINE_TOMORROW_CALLBACK = "tasks:create:deadline:tomorrow"
 TASK_CREATE_DEADLINE_NONE_CALLBACK = "tasks:create:deadline:none"
+TASK_NOTIFICATION_DELETE_CALLBACK_PREFIX = "tasks:notification:delete"
 
 ONE_TIME_TASK_BUTTON = "Разовая"
 RECURRING_TASK_BUTTON = "Регулярная"
@@ -35,6 +36,18 @@ ASSIGN_POOL_BUTTON = "В общий пул"
 TODAY_DEADLINE_BUTTON = "Сегодня"
 TOMORROW_DEADLINE_BUTTON = "Завтра"
 NO_DEADLINE_BUTTON = "Без срока"
+
+
+def task_notification_delete_callback(task_id: int) -> str:
+    return f"{TASK_NOTIFICATION_DELETE_CALLBACK_PREFIX}:{task_id}"
+
+
+def build_completed_task_notification_keyboard(task_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Удалить уведомление", callback_data=task_notification_delete_callback(task_id))]
+        ]
+    )
 
 
 def build_tasks_menu(*, has_pool_tasks: bool = False) -> InlineKeyboardMarkup:

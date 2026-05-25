@@ -155,6 +155,7 @@ async def test_create_task_assigned_to_partner_notifies_partner() -> None:
     assert result.task.assigned_to == partner.id
     assert result.task.status == "ASSIGNED"
     assert result.notification_user is partner
+    assert result.notification_message_kind == "assignment"
     assert task_repository.history == [(result.task.id, "CREATED", creator.id), (result.task.id, "ASSIGNED", creator.id)]
 
 
@@ -176,7 +177,9 @@ async def test_pool_task_can_be_claimed_and_completed() -> None:
     completed = await service.complete_task(partner, created.task.id)
 
     assert claimed.task.assigned_to == partner.id
+    assert claimed.notification_message_kind == "assignment"
     assert completed.task.status == "COMPLETED"
+    assert completed.notification_message_kind == "completed"
 
 
 @pytest.mark.asyncio

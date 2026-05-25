@@ -1077,7 +1077,7 @@
       "id": "MAT-125",
       "title": "Allow deleting completed-task notifications",
       "description": "Let the user delete a completed-task notification and also remove the related assignment info message if it is still present in that chat.",
-      "status": "pending",
+      "status": "done",
       "priority": "P1",
       "category": "tasks-ux",
       "dependencies": [
@@ -1099,7 +1099,8 @@
         "Unrelated task messages are not deleted"
       ],
       "test_steps": [
-        "python -m pytest tests/test_task_service.py tests/test_main_menu_handlers.py tests/test_scheduler_system.py"
+        "python -m pytest tests/test_task_service.py tests/test_main_menu_handlers.py tests/test_scheduler_system.py",
+        "python -m pytest; taskos validate"
       ],
       "notes": "Added from user testing feedback on 2026-05-25."
     },

@@ -651,3 +651,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-125 - Allow deleting completed-task notifications
+
+2026-05-26 01:03 +03:00 MAT-125 Claim
+------------------------------------
+Task: MAT-125 - Allow deleting completed-task notifications.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 01:09 +03:00 MAT-125 Done
+-----------------------------------
+Task: MAT-125 - Allow deleting completed-task notifications.
+
+Done:
+- Completed task notifications now include a delete action, sent task notification messages are tracked by task and kind, and deleting a completion notification also clears related assignment notification blocks when present.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-126 - Connect production-grade AI messaging

@@ -16,6 +16,7 @@ from app.bot.keyboards.tasks import (
     ALL_TASKS_CALLBACK,
     MY_TASKS_CALLBACK,
     TASK_POOL_CALLBACK,
+    TASK_NOTIFICATION_DELETE_CALLBACK_PREFIX,
     TASK_CREATE_ASSIGN_PARTNER_CALLBACK,
     TASK_CREATE_ASSIGN_POOL_CALLBACK,
     TASK_CREATE_ASSIGN_SELF_CALLBACK,
@@ -31,6 +32,7 @@ from app.bot.keyboards.tasks import (
     TASK_CREATE_WEEKLY_CALLBACK,
     TASKS_MENU_CALLBACK,
     build_assignment_keyboard,
+    build_completed_task_notification_keyboard,
     build_deadline_keyboard,
     build_recurrence_keyboard,
     build_recurring_choice_keyboard,
@@ -76,9 +78,42 @@ DEADLINE_BY_CALLBACK = {
     TASK_CREATE_DEADLINE_NONE_CALLBACK: "без срока",
 }
 
+TASK_NOTIFICATION_KIND_ASSIGNMENT = "assignment"
+TASK_NOTIFICATION_KIND_COMPLETED = "completed"
+
 
 def format_task_creation_step(title: str, prompt: str) -> str:
     return f"➕ <b>Добавить задачу</b>\n\n<blockquote>{escape(title)}</blockquote>\n\n{prompt}"
+
+
+def task_notification_block_key(task_id: int, kind: str) -> str:
+    return f"{TASKS_BLOCK_KEY}:n:{task_id}:{kind}"
+
+
+def task_notification_keyboard(result: TaskMutationResult) -> object | None:
+    if result.notification_message_kind != TASK_NOTIFICATION_KIND_COMPLETED:
+        return None
+
+    return build_completed_task_notification_keyboard(result.task.id)
+
+
+async def remember_task_notification_message(
+    session: AsyncSession | None,
+    result: TaskMutationResult,
+    sent_message: Message | None,
+) -> None:
+    if session is None or sent_message is None or result.notification_user is None:
+        return
+    if result.notification_message_kind is None:
+        return
+
+    chat_id = getattr(getattr(sent_message, "chat", None), "id", result.notification_user.telegram_id)
+    await ChatBlockService(session).add_messages(
+        user=result.notification_user,
+        chat_id=chat_id,
+        block_key=task_notification_block_key(result.task.id, result.notification_message_kind),
+        messages=[sent_message],
+    )
 
 
 async def get_current_result_for_callback(callback: CallbackQuery, session: AsyncSession) -> OnboardingResult:
@@ -113,7 +148,7 @@ async def ensure_task_access_for_callback(callback: CallbackQuery, session: Asyn
     return result
 
 
-async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
+async def send_task_notification(bot: Bot, result: TaskMutationResult, session: AsyncSession | None = None) -> None:
     if result.notification_user is None or result.notification_text is None:
         return
 
@@ -124,20 +159,30 @@ async def send_task_notification(bot: Bot, result: TaskMutationResult) -> None:
         escape_suffix=True,
     )
     cat_asset = select_cat_asset(result.cat_notification_type)
+    reply_markup = task_notification_keyboard(result)
+    send_kwargs = {"parse_mode": "HTML"}
+    if reply_markup is not None:
+        send_kwargs["reply_markup"] = reply_markup
     try:
         if cat_asset is not None:
-            await bot.send_photo(
+            sent_message = await bot.send_photo(
                 result.notification_user.telegram_id,
                 FSInputFile(cat_asset),
                 caption=notification_text,
-                parse_mode="HTML",
+                **send_kwargs,
             )
+            await remember_task_notification_message(session, result, sent_message)
             return
     except TelegramAPIError:
         logger.exception("Failed to send task notification photo")
 
     try:
-        await bot.send_message(result.notification_user.telegram_id, notification_text, parse_mode="HTML")
+        sent_message = await bot.send_message(
+            result.notification_user.telegram_id,
+            notification_text,
+            **send_kwargs,
+        )
+        await remember_task_notification_message(session, result, sent_message)
     except TelegramAPIError:
         logger.exception("Failed to send task notification")
 
@@ -287,7 +332,7 @@ async def finish_task_creation(
     creation_input: TaskCreationInput,
 ) -> None:
     mutation_result = await TaskService(session).create_task(result.user, creation_input)
-    await send_task_notification(bot, mutation_result)
+    await send_task_notification(bot, mutation_result, session)
     service = TaskService(session)
     context = await service.get_context(result.user)
     card = await service.build_task_card(context, mutation_result.task, show_ownership=True)
@@ -657,6 +702,41 @@ async def handle_archive_task(callback: CallbackQuery, session: AsyncSession, bo
     await handle_task_mutation(callback, session, bot, action="archive")
 
 
+@router.callback_query(F.data.startswith(f"{TASK_NOTIFICATION_DELETE_CALLBACK_PREFIX}:"))
+async def handle_delete_completed_task_notification(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    result = await ensure_task_access_for_callback(callback, session)
+    if result is None or callback.message is None or callback.data is None:
+        return
+
+    try:
+        task_id = int(callback.data.rsplit(":", maxsplit=1)[-1])
+        await TaskService(session).get_task_for_user(result.user, task_id)
+    except (ValueError, TaskServiceError):
+        await callback.answer("Не смогла найти задачу.", show_alert=True)
+        return
+
+    chat_id = callback.message.chat.id
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=callback.message.message_id)
+    except TelegramAPIError:
+        logger.debug("Failed to delete completed task notification", exc_info=True)
+
+    blocks = ChatBlockService(session)
+    await blocks.reset_block(
+        bot=bot,
+        user=result.user,
+        chat_id=chat_id,
+        block_key=task_notification_block_key(task_id, TASK_NOTIFICATION_KIND_ASSIGNMENT),
+    )
+    await blocks.reset_block(
+        bot=bot,
+        user=result.user,
+        chat_id=chat_id,
+        block_key=task_notification_block_key(task_id, TASK_NOTIFICATION_KIND_COMPLETED),
+    )
+    await callback.answer("Убрала")
+
+
 async def handle_task_mutation(callback: CallbackQuery, session: AsyncSession, bot: Bot, *, action: str) -> None:
     result = await ensure_task_access_for_callback(callback, session)
     if result is None or result.couple is None or callback.message is None or callback.data is None:
@@ -683,7 +763,7 @@ async def handle_task_mutation(callback: CallbackQuery, session: AsyncSession, b
         await callback.answer(str(error), show_alert=True)
         return
 
-    await send_task_notification(bot, mutation_result)
+    await send_task_notification(bot, mutation_result, session)
     service = TaskService(session)
     context = await service.get_context(result.user)
     keyboard = await build_tasks_menu_for_user(session, result.user)

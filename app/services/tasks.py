@@ -52,6 +52,7 @@ class TaskMutationResult:
     task: Task
     notification_user: User | None = None
     notification_text: str | None = None
+    notification_message_kind: str | None = None
     cozy_theme: CozyMessageTheme | None = None
     cozy_subject: str | None = None
     cat_notification_type: CatNotificationType | None = None
@@ -254,6 +255,7 @@ class TaskService:
                     "тебе назначили задачу",
                     task,
                 ),
+                notification_message_kind="assignment",
                 cozy_theme=CozyMessageTheme.TASK_ASSIGNED,
                 cozy_subject=task.title,
             )
@@ -285,6 +287,10 @@ class TaskService:
     async def list_pool(self, current_user: User) -> tuple[CoupleTaskContext, list[Task]]:
         context = await self.get_context(current_user)
         return context, await self.tasks.list_pool_for_couple(context.couple.id)
+
+    async def get_task_for_user(self, current_user: User, task_id: int) -> Task:
+        context = await self.get_context(current_user)
+        return await self._get_scoped_task(context, task_id)
 
     async def regenerate_due_recurring_tasks(
         self,
@@ -336,6 +342,7 @@ class TaskService:
             task=task,
             notification_user=partner,
             notification_text=notification_text,
+            notification_message_kind="assignment",
             cozy_theme=CozyMessageTheme.TASK_CLAIMED,
             cozy_subject=task.title,
         )
@@ -362,6 +369,7 @@ class TaskService:
             task=task,
             notification_user=partner,
             notification_text=notification_text,
+            notification_message_kind="completed",
             cozy_theme=CozyMessageTheme.TASK_COMPLETED,
             cozy_subject=task.title,
             cat_notification_type=CatNotificationType.COMPLETED,

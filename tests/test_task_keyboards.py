@@ -1,5 +1,12 @@
 from app.bot.keyboards.blocks import close_block_callback
-from app.bot.keyboards.tasks import MY_TASKS_CALLBACK, TASK_POOL_CALLBACK, build_task_list_keyboard, build_tasks_menu
+from app.bot.keyboards.tasks import (
+    MY_TASKS_CALLBACK,
+    TASK_POOL_CALLBACK,
+    build_completed_task_notification_keyboard,
+    build_task_list_keyboard,
+    build_tasks_menu,
+    task_notification_delete_callback,
+)
 from app.models import Task
 from app.services.chat_blocks import TASKS_BLOCK_KEY
 
@@ -59,3 +66,11 @@ def test_task_list_keyboard_shows_delete_and_stop_repeat_actions() -> None:
     ]
     assert markup.inline_keyboard[1][0].callback_data == "tasks:archive:1"
     assert markup.inline_keyboard[3][0].callback_data == "tasks:archive:2"
+
+
+def test_completed_task_notification_keyboard_deletes_notification() -> None:
+    markup = build_completed_task_notification_keyboard(task_id=42)
+
+    button = markup.inline_keyboard[0][0]
+    assert button.text == "Удалить уведомление"
+    assert button.callback_data == task_notification_delete_callback(42)

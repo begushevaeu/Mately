@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from app.bot.handlers import tasks
+from app.bot.keyboards.tasks import task_notification_delete_callback
 from app.models import Couple, User
 from app.services.couples import OnboardingResult, OnboardingStatus
 
@@ -24,6 +25,33 @@ class FakeMessage:
         sent_message = FakeMessage(message_id=1000 + len(self.answers), chat_id=self.chat.id)
         self.answers.append(sent_message)
         return sent_message
+
+
+class FakeCallbackUser:
+    id = 100
+    username = None
+    first_name = None
+
+
+class FakeCallback:
+    def __init__(self, *, data: str, message: FakeMessage | None = None) -> None:
+        self.data = data
+        self.message = message
+        self.from_user = FakeCallbackUser()
+        self.answer_text: str | None = None
+        self.answer_kwargs: dict | None = None
+
+    async def answer(self, text: str | None = None, **kwargs) -> None:
+        self.answer_text = text
+        self.answer_kwargs = kwargs
+
+
+class FakeBot:
+    def __init__(self) -> None:
+        self.deleted_messages: list[tuple[int, int]] = []
+
+    async def delete_message(self, *, chat_id: int, message_id: int) -> None:
+        self.deleted_messages.append((chat_id, message_id))
 
 
 class FakeChatBlockService:
@@ -94,3 +122,48 @@ async def test_task_list_panel_renders_index_inside_quote() -> None:
         "<blockquote>1. 🐻 Купить молоко</blockquote>\n"
         "Статус: назначена"
     )
+
+
+@pytest.mark.asyncio
+async def test_completed_task_notification_delete_resets_related_notification_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = User(id=1, telegram_id=100, username="one", first_name="One")
+    result = OnboardingResult(
+        status=OnboardingStatus.IN_COUPLE,
+        user=user,
+        couple=Couple(id=1, invite_code="ABC12345", timezone="Europe/Moscow"),
+    )
+    reset_block_keys: list[str] = []
+
+    async def fake_access(*_, **__) -> OnboardingResult:
+        return result
+
+    class FakeTaskService:
+        def __init__(self, _session) -> None:
+            pass
+
+        async def get_task_for_user(self, current_user: User, task_id: int) -> object:
+            assert current_user is user
+            assert task_id == 42
+            return object()
+
+    class DeletingChatBlockService:
+        def __init__(self, _session) -> None:
+            pass
+
+        async def reset_block(self, *, block_key: str, **_kwargs) -> None:
+            reset_block_keys.append(block_key)
+
+    monkeypatch.setattr(tasks, "ensure_task_access_for_callback", fake_access)
+    monkeypatch.setattr(tasks, "TaskService", FakeTaskService)
+    monkeypatch.setattr(tasks, "ChatBlockService", DeletingChatBlockService)
+
+    callback = FakeCallback(data=task_notification_delete_callback(42), message=FakeMessage(message_id=777))
+    bot = FakeBot()
+
+    await tasks.handle_delete_completed_task_notification(callback, session=None, bot=bot)
+
+    assert bot.deleted_messages == [(100, 777)]
+    assert reset_block_keys == ["tasks:n:42:assignment", "tasks:n:42:completed"]
+    assert callback.answer_text == "Убрала"
