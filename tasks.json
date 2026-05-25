@@ -1104,6 +1104,32 @@
       "notes": "Added from user testing feedback on 2026-05-25."
     },
     {
+      "id": "MAT-128",
+      "title": "Include task list numbers inside quotes",
+      "description": "When tasks are rendered as numbered lists, include the visible list number inside the Telegram quote block with the task title.",
+      "status": "done",
+      "priority": "P1",
+      "category": "tasks-ux",
+      "dependencies": [
+        "MAT-123"
+      ],
+      "scope": [
+        "Update task list rendering so the number is part of the quoted task line",
+        "Keep task metadata outside the quote",
+        "Preserve task action callbacks and list navigation"
+      ],
+      "acceptance_criteria": [
+        "Task list entries show the number inside the quote",
+        "Single task cards and notifications keep their existing quote format",
+        "Task list keyboard actions still use the same task IDs"
+      ],
+      "test_steps": [
+        "python -m pytest tests/test_task_service.py tests/test_task_block_handlers.py tests/test_task_keyboards.py",
+        "python -m pytest; taskos validate"
+      ],
+      "notes": "Added from user testing feedback on 2026-05-26."
+    },
+    {
       "id": "MAT-126",
       "title": "Connect production-grade AI messaging",
       "description": "Replace the visible placeholder-like AI behavior with a properly configured, natural AI message layer for the bot's cozy notifications and summaries.",

@@ -261,8 +261,8 @@ async def render_task_list_panel(
 
     blocks = [f"📋 <b>{title}</b>"]
     for index, task in enumerate(tasks, start=1):
-        card = await service.build_task_card(context, task, show_ownership=show_ownership)
-        blocks.append(f"{index}. {card}")
+        card = await service.build_task_card(context, task, show_ownership=show_ownership, list_index=index)
+        blocks.append(card)
 
     return "\n\n".join(blocks)
 

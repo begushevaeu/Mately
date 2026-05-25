@@ -389,6 +389,27 @@ async def test_partner_aliases_are_used_in_notifications_and_cards() -> None:
     assert "Кому: 🥒Огурчику" in card
 
 
+@pytest.mark.asyncio
+async def test_list_task_card_includes_index_inside_quote() -> None:
+    service, creator, _, _ = build_service()
+    created = await service.create_task(
+        creator,
+        TaskCreationInput(
+            title="Купить молоко",
+            is_recurring=False,
+            recurrence_type=None,
+            assignment_type=AssignmentType.SELF,
+            deadline=None,
+        ),
+    )
+    context = await service.get_context(creator)
+
+    card = await service.build_task_card(context, created.task, show_ownership=True, list_index=3)
+
+    assert card.startswith("<blockquote>3. 🐻 Купить молоко</blockquote>\nСтатус: назначена")
+    assert "\nОт: тебя\nКому: тебе" in card
+
+
 def test_task_title_emoji_rotates_by_task_id() -> None:
     for task_id, expected_emoji in [
         (1, "🐻"),

@@ -587,3 +587,35 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-125 - Allow deleting completed-task notifications
+
+2026-05-26 00:53 +03:00 MAT-128 Claim
+------------------------------------
+Task: MAT-128 - Include task list numbers inside quotes.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Coordination Context:
+- worktree: 1 local change(s) existed before this claim. This is informational in shared worktrees; do not revert unrelated changes.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 00:54 +03:00 MAT-128 Done
+-----------------------------------
+Task: MAT-128 - Include task list numbers inside quotes.
+
+Done:
+- Numbered task lists now pass the visible list number into the task quote, so entries render as quoted '1. emoji title' while metadata stays outside the quote.
+
+Verification:
+- python -m pytest; taskos validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-125 - Allow deleting completed-task notifications

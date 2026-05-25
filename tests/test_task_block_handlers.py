@@ -71,3 +71,26 @@ async def test_tasks_block_remembers_user_trigger_message(monkeypatch: pytest.Mo
     )
 
     assert FakeChatBlockService.remembered_message_ids == [42, 1000]
+
+
+@pytest.mark.asyncio
+async def test_task_list_panel_renders_index_inside_quote() -> None:
+    class FakeTaskService:
+        async def build_task_card(self, _context, _task, *, show_ownership: bool, list_index: int | None = None) -> str:
+            assert show_ownership is True
+            return f"<blockquote>{list_index}. 🐻 Купить молоко</blockquote>\nСтатус: назначена"
+
+    panel = await tasks.render_task_list_panel(
+        FakeTaskService(),
+        context=object(),
+        tasks=[object()],
+        title="Все активные",
+        empty_text="Пусто.",
+        show_ownership=True,
+    )
+
+    assert panel == (
+        "📋 <b>Все активные</b>\n\n"
+        "<blockquote>1. 🐻 Купить молоко</blockquote>\n"
+        "Статус: назначена"
+    )

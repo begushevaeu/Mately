@@ -87,8 +87,9 @@ def get_task_title_emoji(task: Task) -> str:
     return TASK_TITLE_EMOJIS[(task_id - 1) % len(TASK_TITLE_EMOJIS)]
 
 
-def format_task_quote(task: Task) -> str:
-    return f"<blockquote>{get_task_title_emoji(task)} {escape(task.title)}</blockquote>"
+def format_task_quote(task: Task, *, prefix: str | None = None) -> str:
+    prefix_text = f"{escape(prefix)} " if prefix else ""
+    return f"<blockquote>{prefix_text}{get_task_title_emoji(task)} {escape(task.title)}</blockquote>"
 
 
 def build_task_notification_text(actor_label: str, action_text: str, task: Task) -> str:
@@ -175,7 +176,7 @@ def _add_month(value: datetime) -> datetime:
     return value.replace(year=year, month=month, day=day)
 
 
-def build_task_summary(task: Task, timezone_name: str) -> str:
+def build_task_summary(task: Task, timezone_name: str, *, quote_prefix: str | None = None) -> str:
     status_label = {
         "OPEN": "в ярмарке",
         "ASSIGNED": "назначена",
@@ -188,7 +189,7 @@ def build_task_summary(task: Task, timezone_name: str) -> str:
         recurring_label = f"\nПовтор: {format_recurrence_label(task.recurrence_type, task.recurrence_interval_days)}"
 
     return (
-        f"{format_task_quote(task)}\n"
+        f"{format_task_quote(task, prefix=quote_prefix)}\n"
         f"Статус: {status_label}\n"
         f"Срок: {format_deadline(task.deadline, timezone_name)}"
         f"{recurring_label}"
@@ -390,8 +391,16 @@ class TaskService:
             cozy_subject=task.title,
         )
 
-    async def build_task_card(self, context: CoupleTaskContext, task: Task, *, show_ownership: bool = False) -> str:
-        card = build_task_summary(task, context.couple.timezone)
+    async def build_task_card(
+        self,
+        context: CoupleTaskContext,
+        task: Task,
+        *,
+        show_ownership: bool = False,
+        list_index: int | None = None,
+    ) -> str:
+        quote_prefix = f"{list_index}." if list_index is not None else None
+        card = build_task_summary(task, context.couple.timezone, quote_prefix=quote_prefix)
         if not show_ownership:
             return card
 
