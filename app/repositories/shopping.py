@@ -45,6 +45,14 @@ class ShoppingRepository:
         )
         return list(result.scalars().all())
 
+    async def list_for_couple(self, couple_id: int) -> list[ShoppingItem]:
+        result = await self.session.execute(
+            select(ShoppingItem)
+            .where(ShoppingItem.couple_id == couple_id)
+            .order_by(ShoppingItem.completed_at, ShoppingItem.created_at, ShoppingItem.id)
+        )
+        return list(result.scalars().all())
+
     async def mark_bought(self, item: ShoppingItem, *, completed_by: int, completed_at: datetime) -> ShoppingItem:
         item.status = "BOUGHT"
         item.completed_by = completed_by

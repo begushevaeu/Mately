@@ -641,7 +641,7 @@
       "id": "MAT-107",
       "title": "Expand stats with shopping and places",
       "description": "Deepen weekly and monthly recaps so they reflect more of the couple's shared life.",
-      "status": "pending",
+      "status": "done",
       "priority": "P2",
       "category": "analytics",
       "dependencies": [
@@ -662,7 +662,8 @@
         "Existing task/content recap details remain intact"
       ],
       "test_steps": [
-        "python -m pytest tests/test_analytics_recaps.py"
+        "python -m pytest tests/test_analytics_recaps.py",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "Preferred future direction from product docs. Coordinate with the new reporting/export and analytics-event tasks."
     },

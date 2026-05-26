@@ -6,7 +6,7 @@ from app.analytics import (
     build_weekly_recap_text,
     collect_recap_stats,
 )
-from app.models import ContentItem, Rating, Task
+from app.models import ContentItem, PlaceItem, PlaceRating, Rating, ShoppingItem, Task
 
 
 def test_weekly_recap_counts_completed_tasks_content_ratings_and_overdue() -> None:
@@ -71,6 +71,76 @@ def test_weekly_recap_counts_completed_tasks_content_ratings_and_overdue() -> No
     assert stats.overdue_tasks_count == 1
     assert "Закрыто задач: 1" in build_weekly_recap_text(stats)
     assert "Средняя оценка: 8.0/10" in build_weekly_recap_text(stats)
+
+
+def test_weekly_recap_counts_shopping_places_and_top_memory() -> None:
+    local_now = datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc)
+    bought = ShoppingItem(
+        id=1,
+        title="Молоко",
+        couple_id=1,
+        added_by=1,
+        status="BOUGHT",
+        completed_at=datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc),
+    )
+    archived_bought = ShoppingItem(
+        id=2,
+        title="Хлеб",
+        couple_id=1,
+        added_by=1,
+        status="ARCHIVED",
+        completed_at=datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc),
+    )
+    old_bought = ShoppingItem(
+        id=3,
+        title="Старое",
+        couple_id=1,
+        added_by=1,
+        status="ARCHIVED",
+        completed_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+    )
+    visited = PlaceItem(
+        id=1,
+        title="Sage <3",
+        couple_id=1,
+        category="RESTAURANT",
+        added_by=1,
+        status="VISITED",
+        visited_at=datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc),
+    )
+    visited.ratings = [
+        PlaceRating(place_id=1, user_id=1, score=10, response="RATED"),
+        PlaceRating(place_id=1, user_id=2, score=8, response="RATED"),
+    ]
+    old_visited = PlaceItem(
+        id=2,
+        title="Старый парк",
+        couple_id=1,
+        category="PARK",
+        added_by=1,
+        status="VISITED",
+        visited_at=datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc),
+    )
+    old_visited.ratings = [PlaceRating(place_id=2, user_id=1, score=1, response="RATED")]
+
+    stats = collect_recap_stats(
+        [],
+        [],
+        [bought, archived_bought, old_bought],
+        [visited, old_visited],
+        local_now=local_now,
+        period="week",
+    )
+    text = build_weekly_recap_text(stats)
+
+    assert stats.bought_shopping_count == 2
+    assert stats.visited_places_count == 1
+    assert stats.average_place_rating == 9
+    assert stats.place_memory_title == "Sage <3"
+    assert "Куплено из списка: 2" in text
+    assert "Посещено мест: 1" in text
+    assert "Средняя оценка мест: 9.0/10" in text
+    assert "Место периода: Sage &lt;3, 9.0/10" in text
 
 
 def test_monthly_period_on_first_day_uses_previous_month() -> None:

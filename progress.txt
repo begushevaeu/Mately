@@ -738,3 +738,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-107 - Expand stats with shopping and places
+
+2026-05-26 19:32 +03:00 MAT-107 Claim
+------------------------------------
+Task: MAT-107 - Expand stats with shopping and places.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 19:36 +03:00 MAT-107 Done
+-----------------------------------
+Task: MAT-107 - Expand stats with shopping and places.
+
+Done:
+- Expanded weekly and monthly recaps with shopping counts, visited places, place ratings, and a compact top-place memory.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-108 - Add backup and export path
