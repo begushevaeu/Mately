@@ -709,3 +709,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-106 - Add places filters and richer place memories
+
+2026-05-26 19:15 +03:00 MAT-106 Claim
+------------------------------------
+Task: MAT-106 - Add places filters and richer place memories.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 19:20 +03:00 MAT-106 Done
+-----------------------------------
+Task: MAT-106 - Add places filters and richer place memories.
+
+Done:
+- Added quick place filters by category, rating, and recent visits, plus compact visited-place memory cards.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-107 - Expand stats with shopping and places

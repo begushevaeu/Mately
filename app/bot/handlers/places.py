@@ -13,6 +13,9 @@ from app.bot.keyboards.main_menu import PLACES_BUTTON
 from app.bot.keyboards.places import (
     ADD_PLACE_CALLBACK,
     PLACES_CANCEL_CALLBACK,
+    PLACES_FILTER_CATEGORIES_CALLBACK,
+    PLACES_FILTER_RATING_HIGH_CALLBACK,
+    PLACES_FILTER_RECENT_CALLBACK,
     PLACES_MENU_CALLBACK,
     PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX,
     PLACES_PLANNED_CALLBACK,
@@ -37,6 +40,7 @@ from app.services.places import (
     PlaceServiceError,
     format_place_title_quote,
     place_summary_counts,
+    visited_since_for_period,
 )
 
 router = Router()
@@ -345,6 +349,77 @@ async def handle_places_status_list(callback: CallbackQuery, session: AsyncSessi
     empty_text = "Пока пусто."
     service = PlaceService(session)
     context, items = await service.list_items(result.user, PlaceListFilter(status=status))
+    await edit_places_panel(
+        callback.message,
+        await render_places_list_panel(service, context, items, title=title, empty_text=empty_text),
+        build_place_list_keyboard(items),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == PLACES_FILTER_CATEGORIES_CALLBACK)
+async def handle_places_filter_categories(callback: CallbackQuery, session: AsyncSession) -> None:
+    if await ensure_places_access_for_callback(callback, session) is None:
+        return
+
+    if callback.message is not None:
+        await edit_places_panel(
+            callback.message,
+            "📍 <b>Места по категории</b>\n\nВыбери категорию.",
+            build_place_category_keyboard(mode="filter"),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("places:filter:category:"))
+async def handle_places_category_filter(callback: CallbackQuery, session: AsyncSession) -> None:
+    result = await ensure_places_access_for_callback(callback, session)
+    if result is None or callback.message is None or callback.data is None:
+        return
+
+    try:
+        category = PlaceCategory(callback.data.rsplit(":", maxsplit=1)[-1].upper())
+    except ValueError:
+        await callback.answer("Не смогла понять категорию.", show_alert=True)
+        return
+
+    service = PlaceService(session)
+    context, items = await service.list_items(result.user, PlaceListFilter(category=category))
+    await edit_places_panel(
+        callback.message,
+        await render_places_list_panel(
+            service,
+            context,
+            items,
+            title=f"Категория: {CATEGORY_LABELS[category]}",
+            empty_text="В этой категории пока пусто.",
+        ),
+        build_place_list_keyboard(items),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_({PLACES_FILTER_RATING_HIGH_CALLBACK, PLACES_FILTER_RECENT_CALLBACK}))
+async def handle_places_quick_filter(callback: CallbackQuery, session: AsyncSession) -> None:
+    result = await ensure_places_access_for_callback(callback, session)
+    if result is None or callback.message is None:
+        return
+
+    service = PlaceService(session)
+    if callback.data == PLACES_FILTER_RATING_HIGH_CALLBACK:
+        place_filter = PlaceListFilter(min_rating=8)
+        title = "Оценка 8-10"
+        empty_text = "Пока нет мест с такой оценкой."
+    else:
+        context = await service.get_context(result.user)
+        place_filter = PlaceListFilter(
+            status="VISITED",
+            visited_since=visited_since_for_period(context.couple.timezone, "month"),
+        )
+        title = "За 30 дней"
+        empty_text = "За последние 30 дней посещённых мест нет."
+
+    context, items = await service.list_items(result.user, place_filter)
     await edit_places_panel(
         callback.message,
         await render_places_list_panel(service, context, items, title=title, empty_text=empty_text),

@@ -15,7 +15,9 @@ from app.services.places import (
     PlaceServiceError,
     apply_place_filter,
     average_rating,
+    format_place_memory_summary,
     place_summary_counts,
+    visited_since_for_period,
 )
 
 
@@ -191,6 +193,9 @@ async def test_place_can_be_added_visited_rated_and_commented() -> None:
     assert comment.text == "Очень вкусно"
     assert average_rating(items[0]) == 9
     assert card.startswith("<blockquote>Sage &lt;3</blockquote>\nКатегория: 🍽️ Ресторан")
+    assert "Воспоминание: посетили" in card
+    assert "оценка 9.0/10" in card
+    assert "комментариев: 1" in card
     assert "Комментарии:" in card
 
 
@@ -264,18 +269,33 @@ async def test_place_comment_and_rating_require_visit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_place_filters_by_visit_status() -> None:
+async def test_place_filters_by_status_category_rating_and_date() -> None:
     service, creator, partner, _ = build_service()
     restaurant = await service.add_item(creator, category=PlaceCategory.RESTAURANT, title="Ресторан")
     park = await service.add_item(partner, category=PlaceCategory.PARK, title="Парк")
+    cafe = await service.add_item(partner, category=PlaceCategory.CAFE, title="Кафе")
     await service.visit_item(creator, park.id)
+    await service.visit_item(creator, cafe.id)
+    await service.save_rating(creator, place_id=park.id, score=9)
+    await service.save_rating(creator, place_id=cafe.id, score=6)
+    park.visited_at = datetime(2026, 5, 20, 10, 0, tzinfo=timezone.utc)
+    cafe.visited_at = datetime(2026, 4, 1, 10, 0, tzinfo=timezone.utc)
 
     _, planned_items = await service.list_items(creator, PlaceListFilter(status="NOT_VISITED"))
     _, visited_items = await service.list_items(creator, PlaceListFilter(status="VISITED"))
+    _, park_items = await service.list_items(creator, PlaceListFilter(category=PlaceCategory.PARK))
+    _, favorite_items = await service.list_items(creator, PlaceListFilter(min_rating=8))
+    _, recent_items = await service.list_items(
+        creator,
+        PlaceListFilter(visited_since=datetime(2026, 5, 1, tzinfo=timezone.utc)),
+    )
 
     assert planned_items == [restaurant]
-    assert visited_items == [park]
-    assert place_summary_counts([restaurant, park]) == (1, 1)
+    assert visited_items == [park, cafe]
+    assert park_items == [park]
+    assert favorite_items == [park]
+    assert recent_items == [park]
+    assert place_summary_counts([restaurant, park, cafe]) == (1, 2)
     assert apply_place_filter([park, restaurant], PlaceListFilter(status="VISITED")) == [park]
 
 
@@ -306,3 +326,25 @@ def test_place_average_ignores_not_acquainted_responses() -> None:
     ]
 
     assert average_rating(item) == 9
+
+
+def test_place_memory_summary_and_recent_period_use_couple_timezone() -> None:
+    item = PlaceItem(
+        id=1,
+        title="Sage",
+        category="CAFE",
+        added_by=1,
+        status="VISITED",
+        visited_at=datetime(2026, 5, 19, 22, 30, tzinfo=timezone.utc),
+    )
+    item.ratings = [PlaceRating(place_id=1, user_id=1, score=8, response="RATED")]
+    item.comments = [PlaceComment(place_id=1, user_id=1, text="Уютно")]
+
+    since = visited_since_for_period(
+        "Europe/Moscow",
+        "month",
+        now=datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc),
+    )
+
+    assert since == datetime(2026, 4, 20, 9, 0, tzinfo=timezone.utc)
+    assert format_place_memory_summary(item, "Europe/Moscow") == "посетили 20.05.2026 · оценка 8.0/10 · комментариев: 1"

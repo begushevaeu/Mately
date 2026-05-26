@@ -613,7 +613,7 @@
       "id": "MAT-106",
       "title": "Add places filters and richer place memories",
       "description": "Make the places section easier to browse as the list grows, without overloading the Telegram UI.",
-      "status": "pending",
+      "status": "done",
       "priority": "P2",
       "category": "places",
       "dependencies": [
@@ -632,7 +632,8 @@
         "Existing add/visit/rate/comment flows still work"
       ],
       "test_steps": [
-        "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py"
+        "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "Places filters were intentionally deferred in the current MVP. This is lower than the user-requested immediate UX fixes."
     },

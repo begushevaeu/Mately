@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from html import escape
 
@@ -75,6 +75,10 @@ class PlaceContext:
 @dataclass(slots=True)
 class PlaceListFilter:
     status: str | None = None
+    category: PlaceCategory | None = None
+    min_rating: int | None = None
+    max_rating: int | None = None
+    visited_since: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -212,14 +216,16 @@ class PlaceService:
         lines = [
             format_place_title_quote(item, prefix=quote_prefix),
             f"Категория: {category_label(item.category)}",
-            f"Статус: {status_label(item)}",
-            f"Добавил(а): {owner_label}",
-            f"Средняя оценка: {format_average_rating(item)}",
         ]
-        if item.visited_at is not None:
+
+        if item.status == "VISITED":
             visited_by = await self._actor_line(context, item.visited_by)
-            lines.append(f"Посетили: {format_visited_at(item.visited_at, context.couple.timezone)}")
+            lines.append(f"Воспоминание: {format_place_memory_summary(item, context.couple.timezone)}")
             lines.append(f"Отметил(а): {visited_by}")
+        else:
+            lines.append(f"Статус: {status_label(item)}")
+
+        lines.append(f"Добавил(а): {owner_label}")
 
         not_acquainted_line = await self._not_acquainted_line(context, item)
         if not_acquainted_line:
@@ -279,6 +285,16 @@ def apply_place_filter(items: list[PlaceItem], place_filter: PlaceListFilter | N
     for item in items:
         if place_filter.status is not None and item.status != place_filter.status:
             continue
+        if place_filter.category is not None and item.category != place_filter.category:
+            continue
+        average = average_rating(item)
+        if place_filter.min_rating is not None and (average is None or average < place_filter.min_rating):
+            continue
+        if place_filter.max_rating is not None and (average is None or average > place_filter.max_rating):
+            continue
+        if place_filter.visited_since is not None:
+            if item.visited_at is None or item.visited_at < place_filter.visited_since:
+                continue
         filtered_items.append(item)
 
     return sorted_place_items(filtered_items)
@@ -305,7 +321,22 @@ def sorted_comments(item: PlaceItem) -> list[PlaceComment]:
 
 def sorted_place_items(items: list[PlaceItem]) -> list[PlaceItem]:
     status_order = {"NOT_VISITED": 0, "VISITED": 1}
-    return sorted(items, key=lambda item: (status_order.get(item.status, 2), item.category, item.title, item.id or 0))
+
+    def visited_sort_value(item: PlaceItem) -> float:
+        if item.visited_at is None:
+            return 0
+        return -item.visited_at.timestamp()
+
+    return sorted(
+        items,
+        key=lambda item: (
+            status_order.get(item.status, 2),
+            visited_sort_value(item) if item.status == "VISITED" else 0,
+            item.category,
+            item.title,
+            item.id or 0,
+        ),
+    )
 
 
 def category_label(category: str) -> str:
@@ -333,8 +364,37 @@ def format_average_rating(item: PlaceItem) -> str:
     return f"{average:.1f}/10"
 
 
+def format_place_memory_summary(item: PlaceItem, timezone_name: str) -> str:
+    parts = []
+    if item.visited_at is not None:
+        parts.append(f"посетили {format_visited_at(item.visited_at, timezone_name)}")
+
+    average = average_rating(item)
+    if average is not None:
+        parts.append(f"оценка {average:.1f}/10")
+
+    if item.comments:
+        parts.append(f"комментариев: {len(item.comments)}")
+
+    not_acquainted_count = len([rating for rating in item.ratings if rating.response == NOT_ACQUAINTED_RESPONSE])
+    if not_acquainted_count:
+        parts.append(f"не были: {not_acquainted_count}")
+
+    return " · ".join(parts) if parts else "пока без деталей"
+
+
 def format_visited_at(value: datetime, timezone_name: str) -> str:
     return value.astimezone(get_timezone(timezone_name)).strftime("%d.%m.%Y")
+
+
+def visited_since_for_period(timezone_name: str, period: str, now: datetime | None = None) -> datetime:
+    now = now or datetime.now(timezone.utc)
+    local_now = now.astimezone(get_timezone(timezone_name))
+    if period == "week":
+        local_start = local_now - timedelta(days=7)
+    else:
+        local_start = local_now - timedelta(days=30)
+    return local_start.astimezone(timezone.utc)
 
 
 def place_summary_counts(items: list[PlaceItem]) -> tuple[int, int]:

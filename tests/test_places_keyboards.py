@@ -1,6 +1,9 @@
 from app.bot.keyboards.blocks import close_block_callback
 from app.bot.keyboards.places import (
     ADD_PLACE_CALLBACK,
+    PLACES_FILTER_CATEGORIES_CALLBACK,
+    PLACES_FILTER_RATING_HIGH_CALLBACK,
+    PLACES_FILTER_RECENT_CALLBACK,
     PLACES_NOT_ACQUAINTED_CALLBACK_PREFIX,
     PLACES_PLANNED_CALLBACK,
     PLACES_VISITED_CALLBACK,
@@ -18,7 +21,7 @@ def extract_buttons(markup):
     return [button for row in markup.inline_keyboard for button in row]
 
 
-def test_places_menu_contains_core_actions_without_filters() -> None:
+def test_places_menu_contains_core_actions_and_quick_filters() -> None:
     buttons = extract_buttons(build_places_menu())
 
     assert buttons[0].text == "Добавить место"
@@ -27,7 +30,11 @@ def test_places_menu_contains_core_actions_without_filters() -> None:
         PLACES_PLANNED_CALLBACK,
         PLACES_VISITED_CALLBACK,
     ]
-    assert "Фильтры" not in [button.text for button in buttons]
+    assert [button.callback_data for button in buttons[3:6]] == [
+        PLACES_FILTER_CATEGORIES_CALLBACK,
+        PLACES_FILTER_RATING_HIGH_CALLBACK,
+        PLACES_FILTER_RECENT_CALLBACK,
+    ]
     assert buttons[-1].callback_data == close_block_callback(PLACES_BLOCK_KEY)
 
 
@@ -44,6 +51,14 @@ def test_place_category_keyboard_contains_date_categories() -> None:
     assert texts_by_callback["places:create:category:show"] == "Добавить 🎟️ Шоу"
     assert "🚶 Прогулка" not in texts
     assert texts_by_callback["places:create:category:other"] == "Добавить ✨ Другое"
+
+
+def test_place_category_filter_keyboard_keeps_plain_category_labels() -> None:
+    buttons = extract_buttons(build_place_category_keyboard(mode="filter"))
+    texts_by_callback = {button.callback_data: button.text for button in buttons}
+
+    assert texts_by_callback["places:filter:category:restaurant"] == "🍽️ Ресторан"
+    assert texts_by_callback["places:filter:category:park"] == "🌳 Парк"
 
 
 def test_place_list_keyboard_switches_action_by_status() -> None:
