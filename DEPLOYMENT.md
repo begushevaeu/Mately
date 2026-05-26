@@ -23,6 +23,9 @@ Services:
 - `db`: private PostgreSQL container.
 
 The bot uses long polling, not a public HTTP server. Do not add extra replicas unless the bot is converted away from single-process polling.
+Background scheduling also runs inside this single bot process with
+APScheduler. See `SCHEDULING_DECISION.md` before adding Redis, Celery, or
+separate workers.
 
 ## Required Variables
 

@@ -94,6 +94,8 @@ The MVP is deployment-ready as a single polling bot process with PostgreSQL:
 - Full checklist: see `DEPLOYMENT.md`.
 - Backup and export runbook: see `OPERATIONS.md`.
 - Analytics event catalog: see `ANALYTICS_EVENTS.md`.
+- Scheduling decision: see `SCHEDULING_DECISION.md`; APScheduler remains the
+  MVP choice and Redis/Celery are deferred until production load requires them.
 - User-facing content and places export is available in the bot under **Дополнительно -> Экспорт**.
 - Do not run more than one polling bot instance for the same token at the same time.
 

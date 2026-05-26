@@ -1259,7 +1259,7 @@
       "id": "MAT-110",
       "title": "Evaluate Redis or Celery only if scheduling needs grow",
       "description": "Decide whether APScheduler remains sufficient after production use, before adding more infrastructure.",
-      "status": "pending",
+      "status": "done",
       "priority": "P3",
       "category": "infrastructure",
       "dependencies": [
@@ -1278,7 +1278,8 @@
         "Reminder and recap reliability requirements are clear"
       ],
       "test_steps": [
-        "python -m pytest tests/test_scheduler_system.py"
+        "python -m pytest tests/test_scheduler_system.py",
+        "./.venv/Scripts/python.exe -m pytest tests/test_scheduler_system.py; ./.venv/Scripts/taskos.exe validate"
       ],
       "notes": "Redis/Celery is explicitly out of MVP scope."
     },

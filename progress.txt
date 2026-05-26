@@ -865,3 +865,32 @@ Blocked:
 Generated files refreshed:
 - docs\kanban.md
 - docs\task-board.html
+
+2026-05-26 20:15 +03:00 MAT-110 Claim
+------------------------------------
+Task: MAT-110 - Evaluate Redis or Celery only if scheduling needs grow.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 20:17 +03:00 MAT-110 Done
+-----------------------------------
+Task: MAT-110 - Evaluate Redis or Celery only if scheduling needs grow.
+
+Done:
+- Documented that APScheduler remains the MVP scheduler, with Redis/Celery deferred until concrete production reliability or workload triggers appear.
+
+Verification:
+- ./.venv/Scripts/python.exe -m pytest tests/test_scheduler_system.py; ./.venv/Scripts/taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-111 - Run optional Telegram WebApp feasibility spike
