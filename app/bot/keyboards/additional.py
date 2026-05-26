@@ -6,6 +6,7 @@ from app.services.chat_blocks import ADDITIONAL_BLOCK_KEY
 ADDITIONAL_MENU_CALLBACK = "additional:menu"
 ADDITIONAL_STATISTICS_CALLBACK = "additional:statistics"
 ADDITIONAL_SETTINGS_CALLBACK = "additional:settings"
+ADDITIONAL_EXPORT_CALLBACK = "additional:export"
 
 
 def build_additional_keyboard() -> InlineKeyboardMarkup:
@@ -13,6 +14,7 @@ def build_additional_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="📊 Статистика", callback_data=ADDITIONAL_STATISTICS_CALLBACK)],
+                [InlineKeyboardButton(text="📤 Экспорт", callback_data=ADDITIONAL_EXPORT_CALLBACK)],
                 [InlineKeyboardButton(text="⚙️ Настройки", callback_data=ADDITIONAL_SETTINGS_CALLBACK)],
             ]
         ),

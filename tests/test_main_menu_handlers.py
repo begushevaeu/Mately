@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
 from app.bot.handlers import main_menu
+from app.bot.keyboards.additional import ADDITIONAL_EXPORT_CALLBACK
 from app.bot.keyboards.blocks import close_block_callback
 from app.models import Couple, CoupleReminderSettings, User
 from app.services.chat_blocks import (
@@ -63,15 +65,21 @@ class FakeState:
 class FakeBot:
     def __init__(self) -> None:
         self.deleted_messages: list[tuple[int, int]] = []
+        self.documents: list[dict] = []
 
     async def delete_message(self, *, chat_id: int, message_id: int) -> None:
         self.deleted_messages.append((chat_id, message_id))
+
+    async def send_document(self, **kwargs) -> FakeMessage:
+        self.documents.append(kwargs)
+        return FakeMessage(message_id=3000 + len(self.documents))
 
 
 class FakeChatBlockService:
     reset_other_block_key: str | None = None
     reset_block_key: str | None = None
     remembered_message_ids: list[int] = []
+    added_message_ids: list[int] = []
 
     def __init__(self, _session) -> None:
         pass
@@ -84,6 +92,9 @@ class FakeChatBlockService:
 
     async def remember_messages(self, *, messages, **_) -> None:
         self.__class__.remembered_message_ids = [message.message_id for message in messages]
+
+    async def add_messages(self, *, messages, **_) -> None:
+        self.__class__.added_message_ids = [message.message_id for message in messages]
 
 
 class FakeAuthor:
@@ -271,3 +282,42 @@ def test_settings_panel_text_shows_reminder_state() -> None:
     assert "Утренний дайджест: включен, 08:30" in text
     assert "Вечерняя сверка: выключена, 22:00" in text
     assert "Пауза: включена" in text
+
+
+@pytest.mark.asyncio
+async def test_additional_export_sends_zip_document_and_tracks_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = User(id=1, telegram_id=100, username=None, first_name=None)
+    couple = Couple(id=10, invite_code="ABC12345", timezone="Europe/Moscow")
+    result = OnboardingResult(status=OnboardingStatus.IN_COUPLE, user=user, couple=couple)
+    callback = FakeCallback(data=ADDITIONAL_EXPORT_CALLBACK, message=FakeMessage(message_id=77))
+    bot = FakeBot()
+    FakeChatBlockService.added_message_ids = []
+
+    async def fake_get_current_result_for_callback(*_, **__) -> OnboardingResult:
+        return result
+
+    class FakeCoupleExportService:
+        def __init__(self, _session) -> None:
+            pass
+
+        async def build_export(self, exported_couple: Couple):
+            assert exported_couple is couple
+            return SimpleNamespace(
+                data=b"zip-bytes",
+                filename="mately-export-20260526.zip",
+                content_rows=2,
+                place_rows=1,
+            )
+
+    monkeypatch.setattr(main_menu, "get_current_result_for_callback", fake_get_current_result_for_callback)
+    monkeypatch.setattr(main_menu, "CoupleExportService", FakeCoupleExportService)
+    monkeypatch.setattr(main_menu, "ChatBlockService", FakeChatBlockService)
+
+    await main_menu.handle_additional_export(callback, session=None, bot=bot)
+
+    sent_document = bot.documents[0]
+    assert sent_document["chat_id"] == 100
+    assert sent_document["document"].filename == "mately-export-20260526.zip"
+    assert sent_document["caption"] == "Готово: экспорт контента и мест в CSV.\nКонтент: 2, места: 1."
+    assert FakeChatBlockService.added_message_ids == [3001]
+    assert callback.answer_called is True

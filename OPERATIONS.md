@@ -59,13 +59,14 @@ Telegram token.
 For operational backups, use the PostgreSQL dump above. It preserves all tables,
 constraints, and IDs.
 
-For future user-facing exports, the fallback format is a ZIP archive generated
-on demand into `exports/` and deleted after delivery. The archive should contain
-UTF-8 CSV files scoped to one couple only:
+For user-facing exports, the current fallback format is a ZIP archive delivered
+by the bot from **Дополнительно -> Экспорт**. The archive contains UTF-8 CSV
+files scoped to one couple only:
 
 - `content.csv`: title, category, status, completed_at, average_rating, reactions, comments_count.
 - `places.csv`: title, category, status, visited_at, average_rating, comments_count, not_acquainted_count.
 
 Do not include bot tokens, OpenAI keys, database URLs, invite codes, raw
 Telegram IDs, or cross-couple rows in user-facing exports. Google Sheets can be
-added later as a delivery option, but CSV remains the safe fallback.
+added later as a delivery option when credentials and sharing rules are decided,
+but CSV remains the safe fallback.

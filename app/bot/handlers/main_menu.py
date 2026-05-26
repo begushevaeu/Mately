@@ -5,12 +5,13 @@ from html import escape
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics import AnalyticsService
 from app.bot.handlers.onboarding import answer_for_onboarding_state, get_current_onboarding_result
 from app.bot.keyboards.additional import (
+    ADDITIONAL_EXPORT_CALLBACK,
     ADDITIONAL_MENU_CALLBACK,
     ADDITIONAL_SETTINGS_CALLBACK,
     ADDITIONAL_STATISTICS_CALLBACK,
@@ -45,6 +46,7 @@ from app.services.chat_blocks import (
     ChatBlockService,
 )
 from app.services.couples import CoupleService, OnboardingResult, OnboardingStatus, TelegramUserProfile
+from app.services.exports import CoupleExportService
 from app.services.reminder_settings import (
     ReminderSettingsService,
     ReminderSettingsServiceError,
@@ -162,7 +164,7 @@ async def build_statistics_panel_text(
 
 
 def build_additional_panel_text() -> str:
-    return "✨ <b>Дополнительно</b>\n\nЗдесь живут настройки и статистика."
+    return "✨ <b>Дополнительно</b>\n\nЗдесь живут настройки, статистика и экспорт."
 
 
 def build_legacy_settings_panel_text(result: OnboardingResult) -> str:
@@ -318,6 +320,42 @@ async def handle_statistics_period(callback: CallbackQuery, session: AsyncSessio
         parse_mode="HTML",
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == ADDITIONAL_EXPORT_CALLBACK)
+async def handle_additional_export(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    if callback.message is None:
+        await callback.answer()
+        return
+
+    result = await get_current_result_for_callback(callback, session)
+    if result.status is not OnboardingStatus.IN_COUPLE or result.couple is None:
+        await callback.answer("Сначала нужно быть в паре.", show_alert=True)
+        return
+
+    couple_export = await CoupleExportService(session).build_export(result.couple)
+    document = BufferedInputFile(couple_export.data, filename=couple_export.filename)
+    try:
+        sent_message = await bot.send_document(
+            chat_id=callback.message.chat.id,
+            document=document,
+            caption=(
+                "Готово: экспорт контента и мест в CSV.\n"
+                f"Контент: {couple_export.content_rows}, места: {couple_export.place_rows}."
+            ),
+        )
+    except TelegramAPIError:
+        logger.exception("Failed to send couple export")
+        await callback.answer("Не смогла отправить экспорт. Попробуй ещё раз чуть позже.", show_alert=True)
+        return
+
+    await ChatBlockService(session).add_messages(
+        user=result.user,
+        chat_id=callback.message.chat.id,
+        block_key=ADDITIONAL_BLOCK_KEY,
+        messages=[sent_message],
+    )
+    await callback.answer("Экспорт готов")
 
 
 @router.callback_query(F.data == ADDITIONAL_SETTINGS_CALLBACK)

@@ -825,3 +825,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-119 - Export content and places to a smart table
+
+2026-05-26 20:01 +03:00 MAT-119 Claim
+------------------------------------
+Task: MAT-119 - Export content and places to a smart table.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 20:06 +03:00 MAT-119 Done
+-----------------------------------
+Task: MAT-119 - Export content and places to a smart table.
+
+Done:
+- Added a bot export action that delivers a couple-scoped ZIP with content.csv and places.csv fallback export files.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-127 - Allow photo uploads for visited places

@@ -1199,7 +1199,7 @@
       "id": "MAT-119",
       "title": "Export content and places to a smart table",
       "description": "Provide an export of watched/long-list content and visited/long-list places, ideally as a Google Sheets link with two sheets.",
-      "status": "pending",
+      "status": "done",
       "priority": "P3",
       "category": "export",
       "dependencies": [
@@ -1221,7 +1221,8 @@
         "The bot returns a usable link or file without leaking secrets"
       ],
       "test_steps": [
-        "python -m pytest tests/test_content_service.py tests/test_places_service.py"
+        "python -m pytest tests/test_content_service.py tests/test_places_service.py",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "Moved to the long list on 2026-05-25. Google Sheets integration will need a credentials decision before implementation."
     },
