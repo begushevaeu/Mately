@@ -1230,7 +1230,7 @@
       "id": "MAT-127",
       "title": "Allow photo uploads for visited places",
       "description": "Let users attach photos to a place after it has been marked visited, so visited-place memories can include real snapshots.",
-      "status": "pending",
+      "status": "blocked",
       "priority": "P3",
       "category": "places",
       "dependencies": [
@@ -1253,7 +1253,7 @@
       "test_steps": [
         "python -m pytest tests/test_places_service.py tests/test_places_keyboards.py"
       ],
-      "notes": "Added to the long list from user request on 2026-05-25."
+      "notes": "Added to the long list from user request on 2026-05-25.\nMoved to the long list by user request; defer photo upload storage and UX decisions until later."
     },
     {
       "id": "MAT-110",

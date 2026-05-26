@@ -854,3 +854,14 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-127 - Allow photo uploads for visited places
+
+2026-05-26 20:11 +03:00 MAT-127 Blocked
+--------------------------------------
+Task: MAT-127 - Allow photo uploads for visited places.
+
+Blocked:
+- Moved to the long list by user request; defer photo upload storage and UX decisions until later.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
