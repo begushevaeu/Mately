@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.ai.cozy import CozyMessageTheme
 from app.services.chat_blocks import BOT_MANAGED_BLOCK_KEY_SUFFIX
 from app.models import Couple, CoupleReminderSettings, Task, User
 from app.schedulers.system import (
@@ -12,6 +13,8 @@ from app.schedulers.system import (
     MORNING_REMINDER_TIME,
     CoupleScheduleContext,
     build_morning_task_digest_text,
+    build_reminder_cozy_subject,
+    cozy_theme_for_notification_type,
     build_dedupe_key,
     cleanup_stale_bot_messages_for_context,
     due_reminder_types,
@@ -86,6 +89,18 @@ def test_scheduler_skips_disabled_and_paused_reminders() -> None:
     settings.reminders_paused = True
 
     assert due_reminder_types(settings, datetime(2026, 5, 20, 21, 0, tzinfo=timezone.utc)) == []
+
+
+def test_scheduler_uses_specific_cozy_context_for_daily_reminders() -> None:
+    morning_subject = build_reminder_cozy_subject(
+        "morning_reminder",
+        "Доброе утро.\n• Полить цветы\n• Купить корм",
+    )
+
+    assert cozy_theme_for_notification_type("morning_reminder") is CozyMessageTheme.MORNING_DIGEST
+    assert cozy_theme_for_notification_type("evening_reminder") is CozyMessageTheme.EVENING_DIGEST
+    assert morning_subject.startswith("утренний дайджест: Доброе утро.")
+    assert "\n" not in morning_subject
 
 
 def test_scheduler_task_filters_use_deadlines() -> None:

@@ -1163,7 +1163,7 @@
       "id": "MAT-126",
       "title": "Connect production-grade AI messaging",
       "description": "Replace the visible placeholder-like AI behavior with a properly configured, natural AI message layer for the bot's cozy notifications and summaries.",
-      "status": "pending",
+      "status": "done",
       "priority": "P1",
       "category": "cozy-layer",
       "dependencies": [
@@ -1186,7 +1186,8 @@
         "Production configuration for the AI provider is documented and test-covered"
       ],
       "test_steps": [
-        "python -m pytest tests/test_cozy_ai.py tests/test_cat_notification_delivery.py tests/test_scheduler_system.py"
+        "python -m pytest tests/test_cozy_ai.py tests/test_cat_notification_delivery.py tests/test_scheduler_system.py",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "Added from user feedback on 2026-05-25: current AI behavior looks like a stub and should be upgraded before polishing notification tone."
     },

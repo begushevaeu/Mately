@@ -680,3 +680,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-126 - Connect production-grade AI messaging
+
+2026-05-26 18:59 +03:00 MAT-126 Claim
+------------------------------------
+Task: MAT-126 - Connect production-grade AI messaging.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 19:09 +03:00 MAT-126 Done
+-----------------------------------
+Task: MAT-126 - Connect production-grade AI messaging.
+
+Done:
+- Configured production AI messaging with runtime model settings, stronger prompts, safe sanitization, and daily digest context.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-106 - Add places filters and richer place memories

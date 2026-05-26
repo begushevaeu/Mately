@@ -76,6 +76,10 @@ Do not edit the generated kanban or dashboard directly; change `tasks.json` or u
 - `BOT_TOKEN` - Telegram bot token from BotFather.
 - `DATABASE_URL` - SQLAlchemy async PostgreSQL URL. Use `127.0.0.1` for local Docker on Windows.
 - `OPENAI_API_KEY` - optional for the cozy AI layer.
+- `OPENAI_MODEL` - OpenAI chat model for cozy notification copy.
+- `OPENAI_TIMEOUT_SECONDS` - AI request timeout before using deterministic fallback copy.
+- `OPENAI_MAX_TOKENS` - maximum token budget for one cozy message.
+- `OPENAI_TEMPERATURE` - generation temperature for short warm copy.
 - `LOG_LEVEL` - application log level.
 - `SQL_ECHO` - SQLAlchemy query logging toggle.
 - `DEFAULT_TIMEZONE` - fallback timezone for couple reminders.

@@ -12,6 +12,10 @@ def test_env_example_contains_required_runtime_settings() -> None:
         "BOT_TOKEN=",
         "DATABASE_URL=",
         "OPENAI_API_KEY=",
+        "OPENAI_MODEL=",
+        "OPENAI_TIMEOUT_SECONDS=",
+        "OPENAI_MAX_TOKENS=",
+        "OPENAI_TEMPERATURE=",
         "LOG_LEVEL=",
         "SQL_ECHO=",
         "DEFAULT_TIMEZONE=",
@@ -52,3 +56,19 @@ def test_managed_postgres_url_is_normalized_for_async_sqlalchemy() -> None:
     )
 
     assert settings.database_url == "postgresql+asyncpg://user:password@example.internal:5432/mately"
+
+
+def test_ai_runtime_settings_are_configurable_and_bounded() -> None:
+    settings = Settings.model_validate(
+        {
+            "OPENAI_MODEL": " custom-model ",
+            "OPENAI_TIMEOUT_SECONDS": 45,
+            "OPENAI_MAX_TOKENS": 500,
+            "OPENAI_TEMPERATURE": 2,
+        }
+    )
+
+    assert settings.openai_model == "custom-model"
+    assert settings.openai_timeout_seconds == 30
+    assert settings.openai_max_tokens == 200
+    assert settings.openai_temperature == 1.2

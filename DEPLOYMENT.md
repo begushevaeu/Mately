@@ -31,6 +31,10 @@ Create `.env.production` on the VPS from `.env.production.example`:
 ```text
 BOT_TOKEN=<token from BotFather>
 OPENAI_API_KEY=<optional>
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_SECONDS=6
+OPENAI_MAX_TOKENS=90
+OPENAI_TEMPERATURE=0.55
 LOG_LEVEL=INFO
 SQL_ECHO=false
 DEFAULT_TIMEZONE=Europe/Moscow

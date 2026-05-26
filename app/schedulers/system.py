@@ -29,6 +29,7 @@ MORNING_REMINDER_TIME = time(hour=9, minute=0)
 EVENING_REMINDER_TIME = time(hour=21, minute=0)
 RECAP_TIME = time(hour=10, minute=0)
 MORNING_DIGEST_TASK_LIMIT = 5
+REMINDER_COZY_SUBJECT_LIMIT = 180
 
 
 @dataclass(slots=True)
@@ -212,12 +213,14 @@ async def build_due_notifications(
     for notification_type in due_reminder_types(settings, context.local_now):
         if notification_type == "morning_reminder":
             text, cat_type = await build_morning_reminder_text(session, context)
-            subject = "утренний дайджест"
         else:
             text, cat_type = await build_evening_reminder_text(session, context)
-            subject = "вечерняя сверка"
 
-        text = await append_cozy_suffix(text, theme=CozyMessageTheme.RECAP, subject=subject)
+        text = await append_cozy_suffix(
+            text,
+            theme=cozy_theme_for_notification_type(notification_type),
+            subject=build_reminder_cozy_subject(notification_type, text),
+        )
         notifications.append(
             DueNotification(
                 notification_type=notification_type,
@@ -228,6 +231,29 @@ async def build_due_notifications(
         )
 
     return notifications
+
+
+def cozy_theme_for_notification_type(notification_type: str) -> CozyMessageTheme:
+    if notification_type == "morning_reminder":
+        return CozyMessageTheme.MORNING_DIGEST
+    if notification_type == "evening_reminder":
+        return CozyMessageTheme.EVENING_DIGEST
+    return CozyMessageTheme.RECAP
+
+
+def build_reminder_cozy_subject(notification_type: str, text: str) -> str:
+    if notification_type == "morning_reminder":
+        label = "утренний дайджест"
+    elif notification_type == "evening_reminder":
+        label = "вечерняя сверка"
+    else:
+        label = "сводка"
+
+    summary = " ".join(text.split())
+    if len(summary) > REMINDER_COZY_SUBJECT_LIMIT:
+        summary = summary[: REMINDER_COZY_SUBJECT_LIMIT + 1].rsplit(" ", maxsplit=1)[0].rstrip(" ,;:")
+        summary = f"{summary}..."
+    return f"{label}: {summary}"
 
 
 async def send_scheduled_notification_once(
