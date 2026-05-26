@@ -58,6 +58,7 @@ POSTGRES_PASSWORD=<long random password>
 7. Run `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build`.
 8. Confirm startup logs show Alembic migrations running.
 9. Confirm there is only one active bot polling the Telegram token.
+10. Create and restore-check a first database backup using `OPERATIONS.md`.
 
 Useful commands:
 
@@ -67,6 +68,13 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f bot
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 ```
+
+## Backup And Export
+
+Use `OPERATIONS.md` for the production backup command, local restore check, and
+minimal export format decision. Backups are PostgreSQL custom-format dumps kept
+outside Git; user-facing exports should use couple-scoped UTF-8 CSV files until
+Google Sheets delivery is implemented.
 
 ## Smoke Test
 

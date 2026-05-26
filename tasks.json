@@ -671,7 +671,7 @@
       "id": "MAT-108",
       "title": "Add backup and export path",
       "description": "Give the project a simple way to protect or export couple data before the bot becomes depended on day to day.",
-      "status": "pending",
+      "status": "done",
       "priority": "P2",
       "category": "operations",
       "dependencies": [
@@ -690,7 +690,8 @@
         "Production notes point to the backup routine"
       ],
       "test_steps": [
-        "python -m pytest tests/test_deployment_config.py"
+        "python -m pytest tests/test_deployment_config.py",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "Useful before broadening feature scope."
     },

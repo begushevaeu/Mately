@@ -50,6 +50,26 @@ def test_production_compose_keeps_database_private() -> None:
     assert "5432:5432" not in compose
 
 
+def test_operations_runbook_documents_backup_restore_and_export_without_secrets() -> None:
+    runbook = (PROJECT_ROOT / "OPERATIONS.md").read_text(encoding="utf-8")
+    deployment = (PROJECT_ROOT / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "pg_dump" in runbook
+    assert "--format=custom" in runbook
+    assert "pg_restore" in runbook
+    assert "mately_restore" in runbook
+    assert "content.csv" in runbook
+    assert "places.csv" in runbook
+    assert "OPERATIONS.md" in deployment
+    assert "backups/" in gitignore
+    assert "exports/" in gitignore
+    assert "*.dump" in gitignore
+    assert "BOT_TOKEN=" not in runbook
+    assert "OPENAI_API_KEY=" not in runbook
+    assert "POSTGRES_PASSWORD=" not in runbook
+
+
 def test_managed_postgres_url_is_normalized_for_async_sqlalchemy() -> None:
     settings = Settings.model_validate(
         {"DATABASE_URL": "postgresql://user:password@example.internal:5432/mately"}

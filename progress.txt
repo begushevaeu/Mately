@@ -767,3 +767,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-108 - Add backup and export path
+
+2026-05-26 19:38 +03:00 MAT-108 Claim
+------------------------------------
+Task: MAT-108 - Add backup and export path.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 19:41 +03:00 MAT-108 Done
+-----------------------------------
+Task: MAT-108 - Add backup and export path.
+
+Done:
+- Documented production backup, local restore verification, and minimal couple-scoped CSV export fallback; ignored backup/export artifacts.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-120 - Design analytics event dataset for Amplitude

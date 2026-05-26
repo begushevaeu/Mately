@@ -14,5 +14,9 @@ build/
 .idea/
 .vscode/
 logs/
+backups/
+exports/
+*.dump
+*.backup
 docs/
 .taskos.lock
