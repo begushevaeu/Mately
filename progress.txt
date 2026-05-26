@@ -796,3 +796,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-120 - Design analytics event dataset for Amplitude
+
+2026-05-26 19:56 +03:00 MAT-120 Claim
+------------------------------------
+Task: MAT-120 - Design analytics event dataset for Amplitude.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 19:59 +03:00 MAT-120 Done
+-----------------------------------
+Task: MAT-120 - Design analytics event dataset for Amplitude.
+
+Done:
+- Created an Amplitude analytics event catalog with product questions, event table, privacy boundaries, property buckets, and nonblocking ingestion plan.
+
+Verification:
+- .\.venv\Scripts\python.exe -m pytest; .\.venv\Scripts\taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- MAT-119 - Export content and places to a smart table

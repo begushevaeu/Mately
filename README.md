@@ -93,6 +93,7 @@ The MVP is deployment-ready as a single polling bot process with PostgreSQL:
 - VPS: use `docker-compose.prod.yml`, keep `.env.production` outside Git, and run `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build`.
 - Full checklist: see `DEPLOYMENT.md`.
 - Backup and export runbook: see `OPERATIONS.md`.
+- Analytics event catalog: see `ANALYTICS_EVENTS.md`.
 - Do not run more than one polling bot instance for the same token at the same time.
 
 ## Architecture Guardrails

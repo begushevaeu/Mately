@@ -934,7 +934,7 @@
       "id": "MAT-120",
       "title": "Design analytics event dataset for Amplitude",
       "description": "Prepare reporting events and a table that describes every log/event collected for Amplitude analytics.",
-      "status": "pending",
+      "status": "done",
       "priority": "P2",
       "category": "analytics",
       "dependencies": [
@@ -955,7 +955,8 @@
         "No sensitive message text or secrets are planned for logging"
       ],
       "test_steps": [
-        "python -m taskos validate"
+        "python -m taskos validate",
+        ".\\.venv\\Scripts\\python.exe -m pytest; .\\.venv\\Scripts\\taskos.exe validate"
       ],
       "notes": "User-requested rank 10. Keep this after deployment and multi-couple isolation so analytics are scoped correctly."
     },
