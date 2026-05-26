@@ -96,6 +96,8 @@ The MVP is deployment-ready as a single polling bot process with PostgreSQL:
 - Analytics event catalog: see `ANALYTICS_EVENTS.md`.
 - Scheduling decision: see `SCHEDULING_DECISION.md`; APScheduler remains the
   MVP choice and Redis/Celery are deferred until production load requires them.
+- Telegram WebApp feasibility: see `WEBAPP_FEASIBILITY.md`; a Mini App is
+  deferred until dense memories or filters create clear friction.
 - User-facing content and places export is available in the bot under **Дополнительно -> Экспорт**.
 - Do not run more than one polling bot instance for the same token at the same time.
 

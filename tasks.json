@@ -1287,7 +1287,7 @@
       "id": "MAT-111",
       "title": "Run optional Telegram WebApp feasibility spike",
       "description": "Explore whether a WebApp would meaningfully improve dense flows such as filters, memories, or settings.",
-      "status": "pending",
+      "status": "done",
       "priority": "P3",
       "category": "product-spike",
       "dependencies": [
@@ -1307,7 +1307,8 @@
         "No WebApp implementation starts during the spike"
       ],
       "test_steps": [
-        "python -m taskos validate"
+        "python -m taskos validate",
+        "./.venv/Scripts/taskos.exe validate"
       ],
       "notes": "Future option only if Telegram UI becomes limiting."
     }

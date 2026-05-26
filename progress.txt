@@ -894,3 +894,32 @@ Generated files refreshed:
 
 Next Dependency-Ready Pending Task:
 - MAT-111 - Run optional Telegram WebApp feasibility spike
+
+2026-05-26 20:19 +03:00 MAT-111 Claim
+------------------------------------
+Task: MAT-111 - Run optional Telegram WebApp feasibility spike.
+
+Claim:
+- assignee: codex
+- intent: Implement the selected task only.
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+2026-05-26 20:20 +03:00 MAT-111 Done
+-----------------------------------
+Task: MAT-111 - Run optional Telegram WebApp feasibility spike.
+
+Done:
+- Documented the Telegram WebApp feasibility spike and recommended deferring a Mini App until dense memories, combined filters, or public HTTPS needs justify it.
+
+Verification:
+- ./.venv/Scripts/taskos.exe validate
+
+Generated files refreshed:
+- docs\kanban.md
+- docs\task-board.html
+
+Next Dependency-Ready Pending Task:
+- None
